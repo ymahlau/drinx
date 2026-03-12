@@ -34,6 +34,7 @@ extensions = [
     "myst_nb",
     "sphinx.ext.mathjax",
     "sphinx.ext.viewcode",
+    "sphinx_copybutton",
 ]
 
 templates_path = ["_templates"]
@@ -45,8 +46,8 @@ exclude_patterns = []
 
 html_theme = "sphinx_book_theme"
 html_static_path = ["_static"]
-html_favicon = "_static/drinx_favicon.ico"
-html_logo = "_static/drinx_text.png"
+html_favicon = "_static/favicon.ico"
+html_logo = "_static/drinx_text.svg"
 
 html_theme_options = {
     "repository_url": "https://github.com/ymahlau/drinx",
@@ -68,7 +69,6 @@ autosummary_generate = True
 autodoc_default_options = {
     "undoc-members": False,  # Don't document members without docstrings
 }
-autodoc_mock_imports = ["cyipopt"]
 
 nb_execution_mode = "off"
 

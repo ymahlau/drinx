@@ -149,7 +149,7 @@ result = scale(batched)  # shape (2, 2)
 
 ## Documentation
 
-For a detailed documentation, check out the API [here](https://drinx.readthedocs.io/en/latest/).
+For more examples and a detailed documentation, check out the API [here](https://drinx.readthedocs.io/en/latest/).
 
 
 ## Citation

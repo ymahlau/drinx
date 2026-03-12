@@ -2,7 +2,7 @@
    :alt: Drinx Logo
    :align: center
 
-Drinx Documentation: Datclass Registry in JAX
+Drinx Documentation
 ==========================================================================================
 
 Installation
