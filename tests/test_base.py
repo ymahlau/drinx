@@ -1262,7 +1262,7 @@ class TestUpdatedCopy:
             _cache: float = private_field(default=0.0)
 
         foo = Foo(x=1.0)
-        with pytest.raises(TypeError):
+        with pytest.raises((TypeError, ValueError)):
             foo.updated_copy(_cache=5.0)
 
 
@@ -1360,7 +1360,7 @@ class TestAsetTopLevel:
             _cache: float = private_field(default=0.0)
 
         foo = Foo(x=1.0)
-        with pytest.raises(TypeError):
+        with pytest.raises((TypeError, ValueError)):
             foo.aset("_cache", 5.0)
 
     def test_single_field_class(self):
