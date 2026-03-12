@@ -4,7 +4,16 @@ from typing import dataclass_transform, Any, Self
 from dataclasses import field as orig_field
 from drinx.attribute import field, static_field, private_field, static_private_field
 
-@dataclass_transform(field_specifiers=(orig_field, field, static_field, private_field, static_private_field))
+
+@dataclass_transform(
+    field_specifiers=(
+        orig_field,
+        field,
+        static_field,
+        private_field,
+        static_private_field,
+    )
+)
 class DataClass:
     """Base class providing advanced tree operations and automatic dataclass/JAX integration."""
 
@@ -36,7 +45,6 @@ class DataClass:
         )
         dataclass_transform(cls)
 
-    
     @staticmethod
     def _parse_operations(s: str) -> list[tuple[str | int, str]]:
         if not s:
@@ -68,20 +76,28 @@ class DataClass:
                 bracket_content = s[i + 1 : j].strip()
 
                 # Determine if it's an integer or string
-                if bracket_content.isdigit() or (bracket_content.startswith("-") and bracket_content[1:].isdigit()):
+                if bracket_content.isdigit() or (
+                    bracket_content.startswith("-") and bracket_content[1:].isdigit()
+                ):
                     operations.append((int(bracket_content), "index"))
                 elif bracket_content.startswith("'") and bracket_content.endswith("'"):
                     # Extract string content
                     if len(bracket_content) < 2:
-                        raise ValueError(f"Invalid string format in brackets: [{bracket_content}]")
+                        raise ValueError(
+                            f"Invalid string format in brackets: [{bracket_content}]"
+                        )
 
                     string_content = bracket_content[1:-1]
 
                     # Check for forbidden characters
                     if "'" in string_content:
-                        raise ValueError(f"String keys cannot contain single quotes: '{string_content}'")
+                        raise ValueError(
+                            f"String keys cannot contain single quotes: '{string_content}'"
+                        )
                     if "[" in string_content or "]" in string_content:
-                        raise ValueError(f"String keys cannot contain square brackets: '{string_content}'")
+                        raise ValueError(
+                            f"String keys cannot contain square brackets: '{string_content}'"
+                        )
 
                     operations.append((string_content, "key"))
                 else:
@@ -145,26 +161,36 @@ class DataClass:
             if op_type == "attribute":
                 if not hasattr(current_parent, str(op)):
                     if idx != len(ops) - 1 or not create_new_ok:
-                        raise Exception(f"Attribute: {op} does not exist for {current_parent.__class__}")
+                        raise Exception(
+                            f"Attribute: {op} does not exist for {current_parent.__class__}"
+                        )
                     current_parent = None
                 else:
                     current_parent = getattr(current_parent, str(op))
             elif op_type == "index":
                 if not hasattr(current_parent, "__getitem__"):
-                    raise Exception(f"{current_parent.__class__} does not implement __getitem__")
+                    raise Exception(
+                        f"{current_parent.__class__} does not implement __getitem__"
+                    )
                 current_parent = current_parent[int(op)]  # type: ignore
             elif op_type == "key":
                 if not hasattr(current_parent, "__getitem__"):
-                    raise Exception(f"{current_parent.__class__} does not implement __getitem__")
+                    raise Exception(
+                        f"{current_parent.__class__} does not implement __getitem__"
+                    )
                 if op not in current_parent:  # type: ignore
                     if idx != len(ops) - 1 or not create_new_ok:
-                        raise Exception(f"Key: {op} does not exist for {current_parent}")
+                        raise Exception(
+                            f"Key: {op} does not exist for {current_parent}"
+                        )
                     current_parent = None
                 else:
                     current_parent = current_parent[op]  # type: ignore
             else:
-                raise Exception(f"Invalid operation type: {op_type}. This is an internal bug!")
-            
+                raise Exception(
+                    f"Invalid operation type: {op_type}. This is an internal bug!"
+                )
+
             if idx != len(ops) - 1:
                 attr_list.append(current_parent)  # type: ignore
 
@@ -173,32 +199,36 @@ class DataClass:
         for idx in list(range(len(attr_list)))[::-1]:
             op, op_type = ops[idx]
             current_parent = attr_list[idx]
-            
+
             if op_type == "attribute":
                 # Replaced generic DataClass check with standard dataclasses check
                 if not dataclasses.is_dataclass(current_parent):
-                    raise Exception(f"Can only set attribute functionally on a dataclass, but got {current_parent.__class__}")
-                
+                    raise Exception(
+                        f"Can only set attribute functionally on a dataclass, but got {current_parent.__class__}"
+                    )
+
                 # Use standard dataclasses.replace to functionally copy and update the frozen dataclass
-                cur_attr = dataclasses.replace(current_parent, **{str(op): cur_attr}) # type: ignore
-                
+                cur_attr = dataclasses.replace(current_parent, **{str(op): cur_attr})  # type: ignore
+
             elif op_type in ("index", "key"):
                 if not hasattr(current_parent, "copy"):
                     raise Exception(
                         f"Target {current_parent.__class__} must implement a .copy() method for functional updates."
                     )
-                
+
                 # Copy the dictionary/list to avoid mutating the original frozen structure
                 cpy = current_parent.copy()  # type: ignore
-                
+
                 if op_type == "index":
                     cpy[int(op)] = cur_attr
                 else:
                     cpy[op] = cur_attr
-                
+
                 cur_attr = cpy
             else:
-                raise Exception(f"Invalid operation type: {op_type}. This is an internal bug!")
+                raise Exception(
+                    f"Invalid operation type: {op_type}. This is an internal bug!"
+                )
 
         assert cur_attr.__class__ == self.__class__
         return cur_attr

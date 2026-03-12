@@ -15,12 +15,12 @@ def _register_jax_tree(cls_: type[T]) -> type[T]:
     if getattr(cls_, "_jax_tree_registered", False):
         return cls_
 
-    static_fields  = [f.name for f in fields(cls_) if f.metadata.get("jax_static")]
+    static_fields = [f.name for f in fields(cls_) if f.metadata.get("jax_static")]
     dynamic_fields = [f.name for f in fields(cls_) if not f.metadata.get("jax_static")]
 
     def flatten(obj):
         leaves = [getattr(obj, f) for f in dynamic_fields]
-        aux    = tuple(getattr(obj, f) for f in static_fields)
+        aux = tuple(getattr(obj, f) for f in static_fields)
         return leaves, aux
 
     def unflatten(aux, leaves):
@@ -103,7 +103,7 @@ def dataclass(
             match_args=match_args,
             kw_only=kw_only,
             slots=slots,
-            weakref_slot=weakref_slot
+            weakref_slot=weakref_slot,
         )
         cls_ = decorator(cls_)
         return _register_jax_tree(cls_)

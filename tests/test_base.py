@@ -80,7 +80,9 @@ class TestFrozen:
             x: float
 
         foo = Foo(x=1.0)
-        with pytest.raises((dataclasses.FrozenInstanceError, TypeError, AttributeError)):
+        with pytest.raises(
+            (dataclasses.FrozenInstanceError, TypeError, AttributeError)
+        ):
             foo.x = 2.0
 
     def test_cannot_set_new_attribute(self):
@@ -88,7 +90,9 @@ class TestFrozen:
             x: float
 
         foo = Foo(x=1.0)
-        with pytest.raises((dataclasses.FrozenInstanceError, TypeError, AttributeError)):
+        with pytest.raises(
+            (dataclasses.FrozenInstanceError, TypeError, AttributeError)
+        ):
             foo.new_attr = 99  # type: ignore[attr-defined]
 
     def test_cannot_delete_attribute(self):
@@ -96,7 +100,9 @@ class TestFrozen:
             x: float
 
         foo = Foo(x=1.0)
-        with pytest.raises((dataclasses.FrozenInstanceError, TypeError, AttributeError)):
+        with pytest.raises(
+            (dataclasses.FrozenInstanceError, TypeError, AttributeError)
+        ):
             del foo.x
 
     def test_frozen_with_kw_only(self):
@@ -104,7 +110,9 @@ class TestFrozen:
             x: float
 
         foo = Foo(x=1.0)
-        with pytest.raises((dataclasses.FrozenInstanceError, TypeError, AttributeError)):
+        with pytest.raises(
+            (dataclasses.FrozenInstanceError, TypeError, AttributeError)
+        ):
             foo.x = 2.0
 
 
@@ -479,7 +487,7 @@ class TestJaxTransformations:
             x: jax.Array
 
         def loss(foo):
-            return foo.x ** 2
+            return foo.x**2
 
         foo = Foo(x=jnp.array(4.0))
         grads = jax.grad(loss)(foo)
@@ -491,7 +499,7 @@ class TestJaxTransformations:
             n: int = static_field(default=2)
 
         def loss(foo):
-            return foo.x ** foo.n
+            return foo.x**foo.n
 
         foo = Foo(x=jnp.array(3.0))
         grads = jax.grad(loss)(foo)
@@ -582,7 +590,9 @@ class TestInheritance:
             y: float
 
         child = Child(x=1.0, y=2.0)
-        with pytest.raises((dataclasses.FrozenInstanceError, TypeError, AttributeError)):
+        with pytest.raises(
+            (dataclasses.FrozenInstanceError, TypeError, AttributeError)
+        ):
             child.x = 99.0
 
     def test_child_inherits_methods(self):
@@ -787,6 +797,7 @@ class TestPublicAPI:
 
     def test_import_directly(self):
         from drinx import DataClass as DC
+
         assert DC is DataClass
 
 
