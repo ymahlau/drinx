@@ -15,7 +15,30 @@ from drinx.attribute import field, static_field, private_field, static_private_f
     )
 )
 class DataClass:
-    """Base class providing advanced tree operations and automatic dataclass/JAX integration."""
+    """Base class alternative to the ``@drinx.dataclass`` decorator.
+
+    Subclassing ``DataClass`` automatically applies the ``@drinx.dataclass``
+    transform, registering the subclass as a frozen dataclass and a JAX pytree
+    node.  Fields annotated with :func:`static_field` (or ``field(static=True)``)
+    are placed in the pytree auxiliary data (not traced by JAX); all other fields
+    become pytree leaves.
+
+    Usage::
+
+        class MyModel(DataClass):
+            weights: jax.Array
+            learning_rate: float = static_field(default=1e-3)
+
+    Dataclass keyword arguments (``init``, ``repr``, ``eq``, etc.) can be
+    forwarded via the class definition::
+
+        class MyModel(DataClass, order=True, kw_only=True):
+            ...
+
+    Also provides :meth:`aset` for functional nested updates and
+    :meth:`updated_copy` as a convenience wrapper around
+    :func:`dataclasses.replace`.
+    """
 
     def __init_subclass__(
         cls,
@@ -31,6 +54,25 @@ class DataClass:
         slots: bool = False,
         weakref_slot: bool = False,
     ):
+        """Apply the ``@drinx.dataclass`` transform to every subclass automatically.
+
+        Called by Python whenever a new subclass of :class:`DataClass` is
+        defined.  Accepts the same keyword arguments as the standard
+        :func:`dataclasses.dataclass` decorator (except ``frozen``, which is
+        always ``True``).
+
+        Args:
+            init: Generate ``__init__``.
+            repr: Generate ``__repr__``.
+            eq: Generate ``__eq__`` and ``__hash__``.
+            order: Generate comparison methods (``<``, ``<=``, ``>``, ``>=``).
+            unsafe_hash: Force generation of ``__hash__`` even when ``eq=True``.
+            match_args: Set ``__match_args__`` for structural pattern matching.
+            kw_only: Make all fields keyword-only in ``__init__``.
+            slots: Generate ``__slots__`` (ignored; kept for API compatibility).
+            weakref_slot: Add a ``__weakref__`` slot (ignored; kept for API
+                compatibility).
+        """
         super().__init_subclass__()
         # Programmatically apply our custom dataclass wrapper to the subclass.
         dataclass_transform = dataclass(
@@ -47,6 +89,32 @@ class DataClass:
 
     @staticmethod
     def _parse_operations(s: str) -> list[tuple[str | int, str]]:
+        """Parse a path string into a sequence of typed operations.
+
+        Splits an ``aset``-style path such as ``"a->b->[0]->['key']"`` into an
+        ordered list of ``(operand, operation_type)`` pairs understood by
+        :meth:`aset`.
+
+        Operation types:
+
+        * ``"attribute"`` — attribute access (``getattr``).  Operand is the
+          attribute name as a :class:`str`.
+        * ``"index"`` — integer subscript (``obj[n]``).  Operand is an
+          :class:`int`.
+        * ``"key"`` — string subscript (``obj['k']``).  Operand is a
+          :class:`str`.
+
+        Args:
+            s: Path string.  Steps are separated by ``"->"``.  Integer indices
+               are written as ``[n]`` and string keys as ``['k']``.
+
+        Returns:
+            Ordered list of ``(operand, operation_type)`` pairs.
+
+        Raises:
+            ValueError: If *s* is empty, malformed, or contains invalid
+                identifiers or bracket expressions.
+        """
         if not s:
             raise ValueError("Empty string is not valid")
 

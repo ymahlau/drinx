@@ -133,18 +133,19 @@ def dataclass(
         ``frozen=True`` is always enforced and cannot be overridden.  Mutability
         would break JAX's pytree contract.
     """
+
     # The wrapper handles the actual class modification
     def wrapper(cls_: type[T]) -> type[T]:
         # Detect if the class was already processed by __init_subclass__
         if getattr(cls_, "__dataclass_params__", None) is not None:
             # If so, it has generated __setattr__ and __delattr__ methods.
-            # We must delete them from the class dictionary so the second 
+            # We must delete them from the class dictionary so the second
             # pass doesn't throw a "Cannot overwrite attribute" TypeError.
             if "__setattr__" in cls_.__dict__:
                 delattr(cls_, "__setattr__")
             if "__delattr__" in cls_.__dict__:
                 delattr(cls_, "__delattr__")
-        
+
         decorator = dataclass_orig(
             init=init,
             repr=repr,
