@@ -157,4 +157,5 @@ Drinx dataclasses work with all JAX transforms out of the box:
    :hidden:
 
    self
+   examples/basic_usage.ipynb
    api
