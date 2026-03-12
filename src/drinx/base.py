@@ -1,6 +1,9 @@
+from __future__ import annotations
 import dataclasses
+import jax
+import jax.numpy as jnp
 from drinx.transform import dataclass
-from typing import dataclass_transform, Any, Self
+from typing import dataclass_transform, Any, Generic, Self, TypeVar
 from dataclasses import field as orig_field
 from drinx.attribute import field, static_field, private_field, static_private_field
 
@@ -301,6 +304,19 @@ class DataClass:
         assert cur_attr.__class__ == self.__class__
         return cur_attr
 
+    @property
+    def at(self) -> _AtProxy[Self]:
+        """Returns an ``_AtProxy`` for JAX-style ``.at[].set()`` fluent updates.
+
+        Example::
+
+            tree = tree.at["weights"].set(new_weights)
+            tree = tree.at["layer"][0].set(new_layer)
+            mask = jax.tree_map(lambda x: x > 0, tree)
+            tree = tree.at[mask].set(0.0)
+        """
+        return _AtProxy(self)
+
     def updated_copy(self, **kwargs: Any) -> Self:
         """Returns an updated copy of the tree with modified top-level attributes.
 
@@ -312,3 +328,77 @@ class DataClass:
         """
         # Directly utilize dataclasses.replace for standard functional updates
         return dataclasses.replace(self, **kwargs)  # ty:ignore[invalid-argument-type]
+
+
+_DC = TypeVar("_DC", bound="DataClass")
+
+
+class _AtIndexer(Generic[_DC]):
+    """Accumulates a path of keys/indices and dispatches ``.set()`` on a DataClass."""
+
+    def __init__(self, obj: _DC, path: list[str | int | Any]) -> None:
+        self._obj = obj
+        self._path = path
+
+    def __getitem__(self, key: Any) -> "_AtIndexer[_DC]":
+        return _AtIndexer(self._obj, self._path + [key])
+
+    def set(self, value: Any) -> _DC:
+        """Apply a functional update and return the new DataClass instance.
+
+        If the accumulated path contains only ``str``/``int`` keys, delegates to
+        :meth:`DataClass.aset`.  If the single key is a DataClass instance of the
+        same type (mask case), applies element-wise ``jnp.where``.
+
+        Args:
+            value: The new value.  For mask updates this may be a scalar or a
+                DataClass tree of the same type as the mask/object.
+
+        Returns:
+            Updated DataClass instance.
+
+        Raises:
+            TypeError: If the path contains a key of an unsupported type.
+        """
+        path = self._path
+
+        # Mask case: single key that is an instance of the same DataClass type
+        if len(path) == 1 and isinstance(path[0], type(self._obj)):
+            mask = path[0]
+            if isinstance(value, type(self._obj)):
+                return jax.tree.map(
+                    lambda leaf, m, v: jnp.where(m, v, leaf),
+                    self._obj,
+                    mask,
+                    value,
+                )
+            return jax.tree.map(
+                lambda leaf, m: jnp.where(m, value, leaf),
+                self._obj,
+                mask,
+            )
+
+        # Path case: build an aset-compatible path string
+        parts: list[str] = []
+        for key in path:
+            if isinstance(key, str):
+                parts.append(key)
+            elif isinstance(key, int):
+                parts.append(f"[{key}]")
+            else:
+                raise TypeError(
+                    f"Unsupported key type in .at[] path: {type(key).__name__!r}. "
+                    "Expected str, int, or a DataClass mask."
+                )
+        path_str = "->".join(parts)
+        return self._obj.aset(path_str, value)
+
+
+class _AtProxy(Generic[_DC]):
+    """Returned by ``DataClass.at``; entry point for ``.at[key].set()`` syntax."""
+
+    def __init__(self, obj: _DC) -> None:
+        self._obj = obj
+
+    def __getitem__(self, key: Any) -> _AtIndexer[_DC]:
+        return _AtIndexer(self._obj, [key])

@@ -24,7 +24,10 @@ If you want to use the GPU-acceleration from JAX, you can install afterwards:
 pip install jax[cuda]
 ```
 
-## Usage
+## Quickstart
+
+Below you can find some examples to get you quickly started with drinx.
+But, beware, there are so much more features available, which are documented in detail in our [Documentation](https://drinx.readthedocs.io/en/latest/)
 
 ### Decorator style
 
