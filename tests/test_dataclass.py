@@ -457,7 +457,7 @@ class TestStdField:
 
         foo = Foo()
         leaves = jax.tree_util.tree_leaves(foo)
-        assert [] in leaves
+        assert len(leaves) == 0
 
     def test_std_field_not_in_aux(self):
         # Standard field must not appear in aux (it has no jax_static metadata).

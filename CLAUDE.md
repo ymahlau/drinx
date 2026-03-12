@@ -43,16 +43,19 @@ Pre-commit hooks run ruff (lint + format), zizmor (GitHub Actions security), and
 
 ## Architecture
 
-The entire library is three files in `src/drinx/`:
+The library lives in `src/drinx/` with four files:
 
-- **`field.py`**: Defines `field`, `static_field`, `private_field`, `static_private_field`. These are thin wrappers around `dataclasses.field` that inject `jax_static=True/False` into the field's metadata dict and optionally set `init=False` (for "private" variants).
+- **`attribute.py`**: Defines `field`, `static_field`, `private_field`, `static_private_field`. All are thin wrappers around `dataclasses.field` that inject `jax_static=True/False` into the field's metadata dict. `private_*` variants set `init=False`. The unified `field()` function accepts a `static: bool` parameter directly.
 
-- **`dataclass.py`**: Defines the `@dataclass` decorator. It wraps `dataclasses.dataclass` (always with `frozen=True`) and then calls `jax.tree_util.register_pytree_node` on the resulting class. The pytree flatten/unflatten functions split fields by `jax_static` metadata: static fields go into `aux` (auxiliary data, not traced), dynamic fields go into `leaves` (JAX arrays, traced).
+- **`transform.py`**: Defines the `@dataclass` decorator and `_register_jax_tree`. The decorator wraps `dataclasses.dataclass` (always `frozen=True`) then registers the class as a JAX pytree. Flatten/unflatten split fields by `jax_static` metadata: static fields → `aux` (not traced), dynamic fields → `leaves` (traced). A `_jax_tree_registered` guard prevents double-registration.
 
-- **`__init__.py`**: Re-exports `dataclass`, `field`, `static_field`, `private_field`, `static_private_field`.
+- **`base.py`**: Defines `DataClass`, a base class alternative to the `@dataclass` decorator. Uses `@dataclass_transform` for type checker support and `__init_subclass__` to automatically apply the `dataclass` transform to any subclass.
+
+- **`__init__.py`**: Re-exports `dataclass`, `field`, `static_field`, `private_field`, `static_private_field`, `DataClass`.
 
 ### Key design decisions
 
 - All drinx dataclasses are **always frozen** (`frozen=True` is hardcoded). This is required for correctness as JAX pytree nodes must be immutable.
 - The `jax_static` metadata key is the internal marker used to distinguish static vs. dynamic fields.
+- Two usage patterns: decorator (`@drinx.dataclass`) or inheritance (`class Foo(DataClass)`). Both produce identically registered pytrees.
 - The library has a single runtime dependency: `jax>=0.9.0`.
