@@ -23,7 +23,133 @@ If you want to use the GPU-acceleration from JAX, you can install afterwards:
 Usage
 -----
 
+Decorator style
+~~~~~~~~~~~~~~~
 
+Use ``@drinx.dataclass`` as a drop-in replacement for ``@dataclasses.dataclass``.
+The class is automatically frozen and registered as a JAX pytree:
+
+.. code-block:: python
+
+   import jax
+   import jax.numpy as jnp
+   import drinx
+
+   @drinx.dataclass
+   class Params:
+       weights: jax.Array
+       bias: jax.Array
+
+   params = Params(weights=jnp.ones((3,)), bias=jnp.zeros((3,)))
+
+   # Works transparently with JAX transforms
+   doubled = jax.tree_util.tree_map(lambda x: x * 2, params)
+
+Static fields
+~~~~~~~~~~~~~
+
+Fields that should not be traced by JAX (e.g. shapes, dtypes, hyperparameters)
+are marked with ``static_field`` or ``field(static=True)``. Changing a static
+field triggers recompilation under ``jit``:
+
+.. code-block:: python
+
+   @drinx.dataclass
+   class Model:
+       weights: jax.Array
+       hidden_size: int = drinx.static_field(default=128)
+
+   @jax.jit
+   def forward(model, x):
+       # hidden_size is a compile-time constant; weights are traced
+       return model.weights[:model.hidden_size] @ x
+
+   model = Model(weights=jnp.ones((128, 32)))
+
+Inheritance style
+~~~~~~~~~~~~~~~~~
+
+Subclass ``DataClass`` instead of using the decorator. The transform is applied
+automatically — no ``@dataclass`` needed:
+
+.. code-block:: python
+
+   class Model(drinx.DataClass):
+       weights: jax.Array
+       learning_rate: float = drinx.static_field(default=1e-3)
+
+   model = Model(weights=jnp.ones((10,)))
+
+Dataclass options are forwarded via the class definition, or alternatively by
+using a combination of inheritance and decorator:
+
+.. code-block:: python
+
+   class Config(drinx.DataClass, kw_only=True, order=True):
+       hidden_size: int = drinx.static_field(default=128)
+       num_layers: int = drinx.static_field(default=4)
+
+   # This is the recommended way: Typechecker will recognize the kw_only argument correctly
+   @drinx.dataclass(kw_only=True, order=True)
+   class Config(drinx.DataClass):
+       hidden_size: int = drinx.static_field(default=128)
+       num_layers: int = drinx.static_field(default=4)
+
+Functional updates with ``aset``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Because drinx dataclasses are frozen, fields cannot be mutated in place.
+``aset`` performs a functional update and returns a new instance. It supports
+nested paths using ``->`` as a separator, integer indices ``[n]``, and string
+dictionary keys ``['k']``.
+Note that this function is only available when inheriting ``drinx.DataClass``,
+but not from the decorator.
+
+.. code-block:: python
+
+   class Inner(drinx.DataClass):
+       w: jax.Array
+
+   class Outer(drinx.DataClass):
+       inner: Inner
+       bias: jax.Array
+
+   outer = Outer(inner=Inner(w=jnp.ones((3,))), bias=jnp.zeros((1,)))
+
+   # Update a top-level field
+   outer2 = outer.aset("bias", jnp.ones((1,)))
+
+   # Update a nested field
+   outer3 = outer.aset("inner->w", jnp.zeros((3,)))
+
+JAX transforms
+~~~~~~~~~~~~~~
+
+Drinx dataclasses work with all JAX transforms out of the box:
+
+.. code-block:: python
+
+   class State(drinx.DataClass):
+       x: jax.Array
+       step_size: float = drinx.static_field(default=0.1)
+
+   # jit
+   @jax.jit
+   def update(state):
+       # updated_copy is convenience wrapper for altering top-level attributes
+       return state.updated_copy(x=state.x - state.step_size)
+
+   def loss(state):
+       return jnp.sum(state.x ** 2)
+
+   grads = jax.grad(loss)(State(x=jnp.array([1.0, 2.0, 3.0])))
+
+   @jax.vmap
+   def scale(state):
+       return state.x * 2
+
+   batched = State(x=jnp.array([[1.0, 2.0], [3.0, 4.0]]))
+   result = scale(batched)  # shape (2, 2)
 
 .. toctree::
    :maxdepth: 2

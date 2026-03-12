@@ -5,7 +5,7 @@
 [![codecov](https://codecov.io/gh/ymahlau/drinx/branch/main/graph/badge.svg)](https://codecov.io/gh/ymahlau/drinx)
 [![Continuous integration](https://github.com/ymahlau/drinx/actions/workflows/cicd.yml/badge.svg?branch=main)](https://github.com/ymahlau/drinx/actions/workflows/cicd.yml/badge.svg?branch=main)
 
-# Drinx: Dataclass Registry in JAX
+# Drinx: Dataclass Registry in JAX 🥂
 
 Often it is useful to have structures in a program containing a mixture of JAX arrays and non-JAX types (e.g. strings, ...).
 But, this makes it difficult to pass these objects through JAX transformations.
