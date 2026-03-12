@@ -43,3 +43,6 @@ allow-direct-references = true
 [tool.ruff]
 fix = true
 exclude = ["docs", "scripts_dev"]
+
+[tool.ty.src]
+exclude = ["docs/source/examples"]
