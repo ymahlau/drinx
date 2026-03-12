@@ -37,3 +37,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[tool.ruff]
+fix = true
+exclude = ["docs", "scripts_dev"]

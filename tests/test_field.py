@@ -2,7 +2,7 @@
 
 import dataclasses
 
-from drinx.field import field, private_field, static_field, static_private_field
+from drinx import field, private_field, static_field, static_private_field
 
 
 class TestField:

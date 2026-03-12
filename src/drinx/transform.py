@@ -3,10 +3,33 @@ from dataclasses import dataclass as dataclass_orig
 from dataclasses import fields, field as orig_field
 from typing import TypeVar
 from typing import dataclass_transform
-from drinx.field import field, static_field, private_field, static_private_field
+from drinx.attribute import field, static_field, private_field, static_private_field
 from typing import Callable, overload
 
 T = TypeVar("T")
+
+
+def _register_jax_tree(cls_: type[T]) -> type[T]:
+    """Registers a class as a JAX Pytree, safely preventing double-registration."""
+    # Guard: If already registered (e.g., by __init_subclass__), skip re-registering
+    if getattr(cls_, "_jax_tree_registered", False):
+        return cls_
+
+    static_fields  = [f.name for f in fields(cls_) if f.metadata.get("jax_static")]
+    dynamic_fields = [f.name for f in fields(cls_) if not f.metadata.get("jax_static")]
+
+    def flatten(obj):
+        leaves = [getattr(obj, f) for f in dynamic_fields]
+        aux    = tuple(getattr(obj, f) for f in static_fields)
+        return leaves, aux
+
+    def unflatten(aux, leaves):
+        kwargs = {**dict(zip(static_fields, aux)), **dict(zip(dynamic_fields, leaves))}
+        return cls_(**kwargs)
+
+    jax.tree_util.register_pytree_node(cls_, flatten, unflatten)
+    cls_._jax_tree_registered = True  # ty:ignore[unresolved-attribute]
+    return cls_
 
 
 # Overload 1: For when the decorator is called WITHOUT arguments: @dataclass
@@ -80,33 +103,11 @@ def dataclass(
             match_args=match_args,
             kw_only=kw_only,
             slots=slots,
-            weakref_slot=weakref_slot,
+            weakref_slot=weakref_slot
         )
         cls_ = decorator(cls_)
+        return _register_jax_tree(cls_)
 
-        static_fields = [f.name for f in fields(cls_) if f.metadata.get("jax_static")]
-        dynamic_fields = [
-            f.name for f in fields(cls_) if not f.metadata.get("jax_static")
-        ]
-
-        def flatten(obj):
-            leaves = [getattr(obj, f) for f in dynamic_fields]
-            aux = tuple(getattr(obj, f) for f in static_fields)
-            return leaves, aux
-
-        def unflatten(aux, leaves):
-            kwargs = {
-                **dict(zip(static_fields, aux)),
-                **dict(zip(dynamic_fields, leaves)),
-            }
-            return cls_(**kwargs)
-
-        jax.tree_util.register_pytree_node(cls_, flatten, unflatten)
-        return cls_
-
-    # If called with args (e.g. @dataclass(kw_only=True)), return the wrapper
     if cls is None:
         return wrapper
-
-    # If called as @dataclass, apply and return immediately
     return wrapper(cls)
