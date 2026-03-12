@@ -1,0 +1,8 @@
+uv.lock
+.venv
+outputs/
+*.pyc
+*.npz
+docs/build
+docs/source/api
+scripts_dev/

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="5 18 678 232" xmlns:bx="https://boxy-svg.com">
+  <defs>
+    <linearGradient id="gd" x1="0.15" y1="0.05" x2="0.85" y2="0.95" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#82D4F5"/>
+      <stop offset="0.4" stop-color="#3A8CE0"/>
+      <stop offset="1" stop-color="#1B4DAE"/>
+    </linearGradient>
+    <linearGradient id="gd-hi" x1="0.1" y1="0.05" x2="0.55" y2="0.55" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.00"/>
+    </linearGradient>
+    <linearGradient id="gr" x1="0.5" y1="0" x2="0.5" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#FFD84E"/>
+      <stop offset="0.55" stop-color="#FF9700"/>
+      <stop offset="1" stop-color="#E55D00"/>
+    </linearGradient>
+    <linearGradient id="gr-hi" x1="0.1" y1="0" x2="0.6" y2="0.5" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.00"/>
+    </linearGradient>
+    <linearGradient id="gi" x1="0.5" y1="0" x2="0.5" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#FF9500"/>
+      <stop offset="1" stop-color="#CC2525"/>
+    </linearGradient>
+    <radialGradient id="gdot" cx="38%" cy="33%" r="62%">
+      <stop offset="0" stop-color="#FFE044"/>
+      <stop offset="1" stop-color="#FF6800"/>
+    </radialGradient>
+    <linearGradient id="gn" x1="0.5" y1="0" x2="0.5" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#F24C1C"/>
+      <stop offset="1" stop-color="#BA1818"/>
+    </linearGradient>
+    <linearGradient id="gn-hi" x1="0.05" y1="0" x2="0.55" y2="0.55" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.00"/>
+    </linearGradient>
+    <linearGradient id="gx" x1="0.1" y1="0.05" x2="0.9" y2="0.95" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#D0E84A"/>
+      <stop offset="0.5" stop-color="#72B82E"/>
+      <stop offset="1" stop-color="#287020"/>
+    </linearGradient>
+    <linearGradient id="gx-hi" x1="0.05" y1="0.05" x2="0.55" y2="0.55" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.00"/>
+    </linearGradient>
+    <bx:export>
+      <bx:file format="svg"/>
+    </bx:export>
+  </defs>
+  <text x="5" y="235.903" fill="url(#gd)" stroke="#0B1650" stroke-width="18" stroke-linejoin="round" paint-order="stroke fill" style="white-space: pre; stroke-width: 18; font-size: 230px;" font-family="'Nunito', 'Arial Rounded MT Bold', 'Verdana', sans-serif" font-weight="900" font-size="230px">d</text>
+  <text x="5" y="235.903" fill="none" stroke="url(#gd-hi)" stroke-width="22" stroke-linejoin="round" clip-path="none" opacity="1" style="white-space: pre; stroke-width: 22; font-size: 230px;" font-family="'Nunito', 'Arial Rounded MT Bold', 'Verdana', sans-serif" font-weight="900" font-size="230px">d</text>
+  <text x="161.585" y="236.604" fill="url(#gr)" stroke="#1C0800" stroke-width="18" stroke-linejoin="round" paint-order="stroke fill" style="white-space: pre; stroke-width: 18; font-size: 230px;" font-family="'Nunito', 'Arial Rounded MT Bold', 'Verdana', sans-serif" font-weight="900" font-size="230px">r</text>
+  <text x="161.585" y="236.604" fill="none" stroke="url(#gr-hi)" stroke-width="22" stroke-linejoin="round" style="white-space: pre; stroke-width: 22; font-size: 230px;" font-family="'Nunito', 'Arial Rounded MT Bold', 'Verdana', sans-serif" font-weight="900" font-size="230px">r</text>
+  <text x="279.783" y="234.151" fill="url(#gi)" stroke="#1C0800" stroke-width="18" stroke-linejoin="round" paint-order="stroke fill" style="white-space: pre; stroke-width: 18; font-size: 230px;" font-family="'Nunito', 'Arial Rounded MT Bold', 'Verdana', sans-serif" font-weight="900" font-size="230px">ı</text>
+  <circle cx="319.235" cy="51.172" r="26" fill="url(#gdot)" stroke="#1C0800" stroke-width="12" font-family="'Nunito', 'Arial Rounded MT Bold', 'Verdana', sans-serif" font-weight="900" font-size="230px" style="stroke-width: 12;"/>
+  <ellipse cx="311.235" cy="42.172" rx="9" ry="7" fill="white" opacity="0.35" font-family="'Nunito', 'Arial Rounded MT Bold', 'Verdana', sans-serif" font-weight="900" font-size="230px" style="stroke-width: 1;"/>
+  <text x="349.592" y="234.151" fill="url(#gn)" stroke="#1C0800" stroke-width="18" stroke-linejoin="round" paint-order="stroke fill" style="white-space: pre; stroke-width: 18; font-size: 230px;" font-family="'Nunito', 'Arial Rounded MT Bold', 'Verdana', sans-serif" font-weight="900" font-size="230px">n</text>
+  <text x="349.592" y="234.151" fill="none" stroke="url(#gn-hi)" stroke-width="22" stroke-linejoin="round" style="white-space: pre; stroke-width: 22; font-size: 230px;" font-family="'Nunito', 'Arial Rounded MT Bold', 'Verdana', sans-serif" font-weight="900" font-size="230px">n</text>
+  <text x="521.388" y="232.75" fill="url(#gx)" stroke="#071800" stroke-width="18" stroke-linejoin="round" paint-order="stroke fill" style="white-space: pre; stroke-width: 18; font-size: 230px;" font-family="'Nunito', 'Arial Rounded MT Bold', 'Verdana', sans-serif" font-weight="900" font-size="230px">x</text>
+  <text x="521.388" y="232.75" fill="none" stroke="url(#gx-hi)" stroke-width="22" stroke-linejoin="round" style="white-space: pre; stroke-width: 22; font-size: 230px;" font-family="'Nunito', 'Arial Rounded MT Bold', 'Verdana', sans-serif" font-weight="900" font-size="230px">x</text>
+</svg>
