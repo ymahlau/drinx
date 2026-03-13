@@ -122,6 +122,43 @@ but not from the decorator.
    # Update a nested field
    outer3 = outer.aset("inner->w", jnp.zeros((3,)))
 
+Visualization
+~~~~~~~~~~~~~
+
+``tree_diagram`` and ``tree_summary`` let you inspect any JAX pytree at a glance:
+
+.. code-block:: python
+
+   class Encoder(drinx.DataClass):
+       w: jax.Array
+       b: jax.Array
+
+   class Model(drinx.DataClass):
+       encoder: Encoder
+       head: jax.Array
+
+   model = Model(encoder=Encoder(w=jnp.ones((16, 32)), b=jnp.zeros((16,))), head=jnp.ones((4, 16)))
+
+   print(drinx.tree_diagram(model))
+   # Model
+   # ├── .encoder:Encoder
+   # │   ├── .w=f32[16,32] ∈ [1.0, 1.0], μ=1.0, σ=0.0
+   # │   └── .b=f32[16] ∈ [0.0, 0.0], μ=0.0, σ=0.0
+   # └── .head=f32[4,16] ∈ [1.0, 1.0], μ=1.0, σ=0.0
+
+   print(drinx.tree_summary(model))
+   # ┌──────────────┬──────────┬───────┬────────┐
+   # │Name          │Type      │Count  │Size    │
+   # ├──────────────┼──────────┼───────┼────────┤
+   # │.encoder.w    │f32[16,32]│512    │2.00KB  │
+   # ├──────────────┼──────────┼───────┼────────┤
+   # │.encoder.b    │f32[16]   │16     │64.00B  │
+   # ├──────────────┼──────────┼───────┼────────┤
+   # │.head         │f32[4,16] │64     │256.00B │
+   # ├──────────────┼──────────┼───────┼────────┤
+   # │Σ             │Tree      │592    │2.31KB  │
+   # └──────────────┴──────────┴───────┴────────┘
+
 JAX transforms
 ~~~~~~~~~~~~~~
 
@@ -159,4 +196,5 @@ Drinx dataclasses work with all JAX transforms out of the box:
    self
    examples/basic_usage.ipynb
    examples/advanced.ipynb
+   examples/visualization.ipynb
    api

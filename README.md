@@ -150,6 +150,42 @@ batched = State(x=jnp.array([[1.0, 2.0], [3.0, 4.0]]))
 result = scale(batched)  # shape (2, 2)
 ```
 
+### Visualization
+
+`tree_diagram` and `tree_summary` let you inspect any JAX pytree at a glance:
+
+```python
+class Encoder(drinx.DataClass):
+    w: jax.Array
+    b: jax.Array
+
+class Model(drinx.DataClass):
+    encoder: Encoder
+    head: jax.Array
+
+model = Model(encoder=Encoder(w=jnp.ones((16, 32)), b=jnp.zeros((16,))), head=jnp.ones((4, 16)))
+
+print(drinx.tree_diagram(model))
+# Model
+# ├── .encoder:Encoder
+# │   ├── .w=f32[16,32] ∈ [1.0, 1.0], μ=1.0, σ=0.0
+# │   └── .b=f32[16] ∈ [0.0, 0.0], μ=0.0, σ=0.0
+# └── .head=f32[4,16] ∈ [1.0, 1.0], μ=1.0, σ=0.0
+
+print(drinx.tree_summary(model))
+# ┌──────────────┬──────────┬───────┬────────┐
+# │Name          │Type      │Count  │Size    │
+# ├──────────────┼──────────┼───────┼────────┤
+# │.encoder.w    │f32[16,32]│512    │2.00KB  │
+# ├──────────────┼──────────┼───────┼────────┤
+# │.encoder.b    │f32[16]   │16     │64.00B  │
+# ├──────────────┼──────────┼───────┼────────┤
+# │.head         │f32[4,16] │64     │256.00B │
+# ├──────────────┼──────────┼───────┼────────┤
+# │Σ             │Tree      │592    │2.31KB  │
+# └──────────────┴──────────┴───────┴────────┘
+```
+
 ## Documentation
 
 For more examples and a detailed documentation, check out the API [here](https://drinx.readthedocs.io/en/latest/).

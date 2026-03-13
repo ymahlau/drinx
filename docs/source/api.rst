@@ -10,3 +10,6 @@ API
     drinx.private_field
     drinx.static_private_field
     drinx.DataClass
+    drinx.tree_diagram
+    drinx.tree_summary
+    drinx.is_traced

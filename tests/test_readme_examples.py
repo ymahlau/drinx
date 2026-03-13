@@ -187,3 +187,59 @@ class TestJaxTransformsExample:
 
         assert result.shape == (2, 2)
         np.testing.assert_allclose(result, jnp.array([[2.0, 4.0], [6.0, 8.0]]))
+
+
+# ---------------------------------------------------------------------------
+# Visualization
+# ---------------------------------------------------------------------------
+
+
+class TestVisualizationExample:
+    def setup_method(self):
+        class Encoder(drinx.DataClass):
+            w: jax.Array
+            b: jax.Array
+
+        class Model(drinx.DataClass):
+            encoder: Encoder
+            head: jax.Array
+
+        self.model = Model(
+            encoder=Encoder(w=jnp.ones((16, 32)), b=jnp.zeros((16,))),
+            head=jnp.ones((4, 16)),
+        )
+
+    def test_tree_diagram_returns_string(self):
+        result = drinx.tree_diagram(self.model)
+        assert isinstance(result, str)
+
+    def test_tree_diagram_contains_structure(self):
+        result = drinx.tree_diagram(self.model)
+        assert "Model" in result
+        assert ".encoder" in result
+        assert ".w" in result
+        assert ".b" in result
+        assert ".head" in result
+
+    def test_tree_diagram_contains_leaf_summaries(self):
+        result = drinx.tree_diagram(self.model)
+        assert "f32[16,32]" in result
+        assert "f32[16]" in result
+        assert "f32[4,16]" in result
+
+    def test_tree_summary_returns_string(self):
+        result = drinx.tree_summary(self.model)
+        assert isinstance(result, str)
+
+    def test_tree_summary_contains_paths(self):
+        result = drinx.tree_summary(self.model)
+        assert ".encoder" in result
+        assert ".w" in result
+        assert ".b" in result
+        assert ".head" in result
+
+    def test_tree_summary_contains_totals_row(self):
+        result = drinx.tree_summary(self.model)
+        assert "Σ" in result
+        # total element count: 16*32 + 16 + 4*16 = 512 + 16 + 64 = 592
+        assert "592" in result
