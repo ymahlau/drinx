@@ -49,7 +49,7 @@ The library lives in `src/drinx/` with four files:
 
 - **`transform.py`**: Defines the `@dataclass` decorator and `_register_jax_tree`. The decorator wraps `dataclasses.dataclass` (always `frozen=True`) then registers the class as a JAX pytree. Flatten/unflatten split fields by `jax_static` metadata: static fields → `aux` (not traced), dynamic fields → `leaves` (traced). A `_jax_tree_registered` guard prevents double-registration.
 
-- **`base.py`**: Defines `DataClass`, a base class alternative to the `@dataclass` decorator. Uses `@dataclass_transform` for type checker support and `__init_subclass__` to automatically apply the `dataclass` transform to any subclass.
+- **`base.py`**: Defines `DataClass`, a base class alternative to the `@dataclass` decorator. Uses `@dataclass_transform` for type checker support and `__init_subclass__` to automatically apply the `dataclass` transform to any subclass. Also provides `aset(path, val)` for functional nested updates using path strings (e.g. `"a->b->[0]->['key']"`), `updated_copy(**kwargs)` as a wrapper around `dataclasses.replace`, and the `.at[key].set(val)` fluent API (via `_AtProxy`/`_AtIndexer`) that supports both path-based and mask-based updates.
 
 - **`__init__.py`**: Re-exports `dataclass`, `field`, `static_field`, `private_field`, `static_private_field`, `DataClass`.
 
@@ -57,5 +57,5 @@ The library lives in `src/drinx/` with four files:
 
 - All drinx dataclasses are **always frozen** (`frozen=True` is hardcoded). This is required for correctness as JAX pytree nodes must be immutable.
 - The `jax_static` metadata key is the internal marker used to distinguish static vs. dynamic fields.
-- Two usage patterns: decorator (`@drinx.dataclass`) or inheritance (`class Foo(DataClass)`). Both produce identically registered pytrees.
+- Two usage patterns: decorator (`@drinx.dataclass`) or inheritance (`class Foo(DataClass)`). Both produce identically registered pytrees. `DataClass` methods (`aset`, `updated_copy`, `.at[].set()`) are only available with the inheritance pattern.
 - The library has a single runtime dependency: `jax>=0.9.0`.

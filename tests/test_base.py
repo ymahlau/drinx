@@ -1803,3 +1803,88 @@ class TestAsetMixedPaths:
         updated = foo.aset("items->[0]", jnp.array(99.0))
         assert float(updated.items[0]) == pytest.approx(99.0)
         assert float(updated.items[1]) == pytest.approx(2.0)
+
+
+# ---------------------------------------------------------------------------
+# aset_inplace
+# ---------------------------------------------------------------------------
+
+
+class TestAsetInplace:
+    def test_simple_top_level_in_post_init(self):
+        class Foo(DataClass):
+            x: float
+            doubled: float = private_field()
+
+            def __post_init__(self) -> None:
+                self.aset_inplace("doubled", self.x * 2)
+
+        foo = Foo(x=3.0)  # ty:ignore[missing-argument]
+        assert foo.doubled == 6.0
+
+    def test_nested_path(self):
+        class Inner(DataClass):
+            b: float
+
+        class Outer(DataClass):
+            a: Inner
+            b_cache: float = private_field()
+
+            def __post_init__(self) -> None:
+                self.aset_inplace("b_cache", self.a.b + 1.0)
+
+        outer = Outer(a=Inner(b=5.0))  # ty:ignore[missing-argument]
+        assert outer.b_cache == 6.0
+
+    def test_list_index(self):
+        class Foo(DataClass):
+            items: list
+
+            def __post_init__(self) -> None:
+                # mutate the list element in-place (list is mutable)
+                self.aset_inplace("items->[0]", 99.0)
+
+        foo = Foo(items=[1.0, 2.0])
+        assert foo.items[0] == 99.0
+        assert foo.items[1] == 2.0
+
+    def test_dict_key(self):
+        class Foo(DataClass):
+            data: dict
+
+            def __post_init__(self) -> None:
+                self.aset_inplace("data->['x']", 42.0)
+
+        foo = Foo(data={"x": 0.0, "y": 1.0})
+        assert foo.data["x"] == 42.0
+        assert foo.data["y"] == 1.0
+
+    def test_mutates_original_unlike_aset(self):
+        """aset_inplace mutates self; aset returns a new object."""
+
+        class Foo(DataClass):
+            x: float
+
+        foo = Foo(x=1.0)
+        # aset: returns new object, original unchanged (frozen)
+        new_foo = foo.aset("x", 2.0)
+        assert foo.x == 1.0
+        assert new_foo.x == 2.0
+
+        # aset_inplace: mutates in place, returns None
+        result = foo.aset_inplace("x", 3.0)
+        assert result is None
+        assert foo.x == 3.0
+
+    def test_private_field_scenario(self):
+        """Typical __post_init__ pattern: derive a private field from init fields."""
+
+        class Model(DataClass):
+            weights: list
+            n_params: int = private_field()
+
+            def __post_init__(self) -> None:
+                self.aset_inplace("n_params", len(self.weights))
+
+        m = Model(weights=[1.0, 2.0, 3.0])  # ty:ignore[missing-argument]
+        assert m.n_params == 3

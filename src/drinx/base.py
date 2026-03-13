@@ -196,6 +196,59 @@ class DataClass:
 
         return operations
 
+    def _traverse_path(
+        self,
+        ops: list[tuple[str | int, str]],
+    ) -> list[Any]:
+        """Top-down traversal along *ops*, returning all intermediate parents.
+
+        Returns a list of length ``len(ops)`` where index ``i`` is the parent
+        object on which ``ops[i]`` should be applied.  The list always starts
+        with ``self``.
+
+        Navigates through ``ops[:-1]`` (all but the final step), so the caller
+        is responsible for handling the final operation.  All intermediate
+        missing attributes/keys raise ``Exception``.
+
+        Args:
+            ops: Parsed operation list from :meth:`_parse_operations`.
+
+        Returns:
+            List of parent objects, one per operation.
+
+        Raises:
+            Exception: If any intermediate attribute or key is missing.
+        """
+        attr_list: list[Any] = [self]
+        current_parent: Any = self
+        for op, op_type in ops[:-1]:
+            if op_type == "attribute":
+                if not hasattr(current_parent, str(op)):
+                    raise Exception(
+                        f"Attribute: {op} does not exist for {current_parent.__class__}"
+                    )
+                current_parent = getattr(current_parent, str(op))
+            elif op_type == "index":
+                if not hasattr(current_parent, "__getitem__"):
+                    raise Exception(
+                        f"{current_parent.__class__} does not implement __getitem__"
+                    )
+                current_parent = current_parent[int(op)]  # type: ignore
+            elif op_type == "key":
+                if not hasattr(current_parent, "__getitem__"):
+                    raise Exception(
+                        f"{current_parent.__class__} does not implement __getitem__"
+                    )
+                if op not in current_parent:  # type: ignore
+                    raise Exception(f"Key: {op} does not exist for {current_parent}")
+                current_parent = current_parent[op]  # type: ignore
+            else:
+                raise Exception(
+                    f"Invalid operation type: {op_type}. This is an internal bug!"
+                )
+            attr_list.append(current_parent)
+        return attr_list
+
     def aset(
         self,
         attr_name: str,
@@ -226,44 +279,26 @@ class DataClass:
         ops = self._parse_operations(attr_name)
 
         # 1. Top-down traversal: Find final attribute and save intermediate parents
-        attr_list = [self]
-        current_parent = self
-        for idx, (op, op_type) in enumerate(ops):
-            if op_type == "attribute":
-                if not hasattr(current_parent, str(op)):
-                    if idx != len(ops) - 1 or not create_new_ok:
-                        raise Exception(
-                            f"Attribute: {op} does not exist for {current_parent.__class__}"
-                        )
-                    current_parent = None
-                else:
-                    current_parent = getattr(current_parent, str(op))
-            elif op_type == "index":
-                if not hasattr(current_parent, "__getitem__"):
-                    raise Exception(
-                        f"{current_parent.__class__} does not implement __getitem__"
-                    )
-                current_parent = current_parent[int(op)]  # type: ignore
-            elif op_type == "key":
-                if not hasattr(current_parent, "__getitem__"):
-                    raise Exception(
-                        f"{current_parent.__class__} does not implement __getitem__"
-                    )
-                if op not in current_parent:  # type: ignore
-                    if idx != len(ops) - 1 or not create_new_ok:
-                        raise Exception(
-                            f"Key: {op} does not exist for {current_parent}"
-                        )
-                    current_parent = None
-                else:
-                    current_parent = current_parent[op]  # type: ignore
-            else:
-                raise Exception(
-                    f"Invalid operation type: {op_type}. This is an internal bug!"
-                )
+        attr_list = self._traverse_path(ops)
+        final_op, final_op_type = ops[-1]
+        parent = attr_list[-1]
 
-            if idx != len(ops) - 1:
-                attr_list.append(current_parent)  # type: ignore
+        # Validate the final step (respecting create_new_ok)
+        if final_op_type == "attribute":
+            if not hasattr(parent, str(final_op)):
+                if not create_new_ok:
+                    raise Exception(
+                        f"Attribute: {final_op} does not exist for {parent.__class__}"
+                    )
+        elif final_op_type == "index":
+            if not hasattr(parent, "__getitem__"):
+                raise Exception(f"{parent.__class__} does not implement __getitem__")
+        elif final_op_type == "key":
+            if not hasattr(parent, "__getitem__"):
+                raise Exception(f"{parent.__class__} does not implement __getitem__")
+            if final_op not in parent:
+                if not create_new_ok:
+                    raise Exception(f"Key: {final_op} does not exist for {parent}")
 
         # 2. Bottom-up copy: Set attributes functionally returning a brand-new top-level instance
         cur_attr = val
@@ -279,7 +314,7 @@ class DataClass:
                     )
 
                 # Use standard dataclasses.replace to functionally copy and update the frozen dataclass
-                cur_attr = dataclasses.replace(current_parent, **{str(op): cur_attr})  # type: ignore
+                cur_attr = dataclasses.replace(current_parent, **{str(op): cur_attr})
 
             elif op_type in ("index", "key"):
                 if not hasattr(current_parent, "copy"):
@@ -288,7 +323,7 @@ class DataClass:
                     )
 
                 # Copy the dictionary/list to avoid mutating the original frozen structure
-                cpy = current_parent.copy()  # type: ignore
+                cpy = current_parent.copy()
 
                 if op_type == "index":
                     cpy[int(op)] = cur_attr
@@ -303,6 +338,40 @@ class DataClass:
 
         assert cur_attr.__class__ == self.__class__
         return cur_attr
+
+    def aset_inplace(self, attr_name: str, val: Any) -> None:
+        """Sets an attribute of this dataclass **in place** by bypassing the frozen
+        restriction via ``object.__setattr__``.
+
+        .. warning::
+            **This method is NOT functional and is potentially very unsafe.**
+            It mutates ``self`` directly, violating the immutability contract that
+            JAX pytree registration relies on.  Using it outside of
+            ``__post_init__`` — or on an object that is already part of a JAX
+            computation — can lead to silent correctness bugs, broken JAX caches,
+            and undefined behaviour.  Prefer :meth:`aset` for all normal use.
+
+        The primary intended use case is setting derived or cached fields inside
+        ``__post_init__``, before the instance is passed to JAX.
+
+        Supports the same path syntax as :meth:`aset`:
+        ``"a->b->[0]->['key']"``.
+
+        Args:
+            attr_name: Path string (see :meth:`aset` for syntax).
+            val: Value to assign at the target location.
+        """
+        ops = self._parse_operations(attr_name)
+        attr_list = self._traverse_path(ops)
+        final_op, final_op_type = ops[-1]
+        parent = attr_list[-1]
+
+        if final_op_type == "attribute":
+            object.__setattr__(parent, str(final_op), val)
+        elif final_op_type == "index":
+            parent[int(final_op)] = val
+        elif final_op_type == "key":
+            parent[final_op] = val
 
     @property
     def at(self) -> _AtProxy[Self]:
