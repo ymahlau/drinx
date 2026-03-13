@@ -18,16 +18,18 @@ def _register_jax_tree(cls_: type[T]) -> type[T]:
     static_fields = [f.name for f in fields(cls_) if f.metadata.get("jax_static")]
     dynamic_fields = [f.name for f in fields(cls_) if not f.metadata.get("jax_static")]
 
-    def flatten(obj):
-        leaves = [getattr(obj, f) for f in dynamic_fields]
+    def flatten_with_keys(obj):
+        keyed_leaves = [
+            (jax.tree_util.GetAttrKey(f), getattr(obj, f)) for f in dynamic_fields
+        ]
         aux = tuple(getattr(obj, f) for f in static_fields)
-        return leaves, aux
+        return keyed_leaves, aux
 
     def unflatten(aux, leaves):
         kwargs = {**dict(zip(static_fields, aux)), **dict(zip(dynamic_fields, leaves))}
         return cls_(**kwargs)
 
-    jax.tree_util.register_pytree_node(cls_, flatten, unflatten)
+    jax.tree_util.register_pytree_with_keys(cls_, flatten_with_keys, unflatten)
     cls_._jax_tree_registered = True  # ty:ignore[unresolved-attribute]
     return cls_
 
