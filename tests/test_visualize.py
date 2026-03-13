@@ -5,7 +5,6 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pytest
 
 import drinx
 from drinx import DataClass, static_field
@@ -208,13 +207,11 @@ class TestVisualizeLeafTracers:
 
 
 class TestVisualizeLeafUnsupported:
-    def test_string_raises(self):
-        with pytest.raises(AssertionError, match="Unsupported type"):
-            visualize_leaf("hello")  # type: ignore[arg-type]
+    def test_string_returns_repr(self):
+        assert visualize_leaf("hello") == "'hello'"  # type: ignore[arg-type]
 
-    def test_list_raises(self):
-        with pytest.raises(AssertionError, match="Unsupported type"):
-            visualize_leaf([1, 2, 3])  # type: ignore[arg-type]
+    def test_list_returns_repr(self):
+        assert visualize_leaf([1, 2, 3]) == "[1, 2, 3]"  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
@@ -529,3 +526,56 @@ class TestTreeDiagramEdgeCases:
     def test_dict_nested_in_list(self):
         result = tree_diagram([{"a": 1.0}])
         assert "['a']=1.0" in result
+
+
+# ---------------------------------------------------------------------------
+# tree_diagram — static_leaves
+# ---------------------------------------------------------------------------
+
+
+class TestTreeDiagramStaticLeaves:
+    def test_static_field_shown_when_enabled(self):
+        class Cfg(DataClass):
+            weights: jnp.ndarray
+            lr: float = static_field(default=0.01)
+
+        result = tree_diagram(Cfg(weights=jnp.array([1.0, 2.0])), static_leaves=True)
+        assert ".lr" in result
+
+    def test_static_field_absent_by_default(self):
+        class Cfg(DataClass):
+            weights: jnp.ndarray
+            lr: float = static_field(default=0.01)
+
+        result = tree_diagram(Cfg(weights=jnp.array([1.0, 2.0])))
+        assert ".lr" not in result
+
+    def test_declaration_order_preserved(self):
+        class Cfg(DataClass):
+            a: float
+            c: float
+            b: float = static_field(default=0.5)
+
+        result = tree_diagram(Cfg(a=1.0, c=3.0), static_leaves=True)
+        lines = result.splitlines()
+        labels = [line.split("=")[0].strip().lstrip("├└─ ") for line in lines[1:]]
+        assert labels == [".a", ".c", ".b"]
+
+    def test_static_int_value_rendered(self):
+        class Cfg(DataClass):
+            x: float
+            n: int = static_field(default=4)
+
+        result = tree_diagram(Cfg(x=1.0), static_leaves=True)
+        assert ".n=4" in result
+
+    def test_static_tuple_value_rendered(self):
+        class Cfg(DataClass):
+            x: float
+            shape: tuple = static_field(default=(2, 3))
+
+        result = tree_diagram(Cfg(x=1.0), static_leaves=True)
+        # tuple is a pytree so it gets expanded
+        assert ".shape:tuple" in result
+        assert "[0]=2" in result
+        assert "[1]=3" in result
