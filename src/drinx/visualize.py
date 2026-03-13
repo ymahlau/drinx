@@ -164,6 +164,6 @@ def tree_diagram(
     Returns:
         A multi-line string with the tree diagram.
     """
-    lines = ["Tree"]
+    lines = [type(tree).__name__]
     _build_lines(tree, 0, max_depth, "", lines, static_leaves)
     return "\n".join(lines)

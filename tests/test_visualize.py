@@ -302,19 +302,19 @@ class TestGetOneLevel:
 
 
 class TestTreeDiagramStructure:
-    def test_starts_with_tree(self):
+    def test_starts_with_class_name(self):
         result = tree_diagram(1.0)
-        assert result.startswith("Tree")
+        assert result.startswith("float")
 
     def test_single_leaf(self):
         result = tree_diagram(42.0)
-        assert result == "Tree"
+        assert result == "float"
 
     def test_flat_list(self):
         result = tree_diagram([1.0, 2.0, 3.0])
         lines = result.splitlines()
-        assert lines[0] == "Tree"
-        assert len(lines) == 4  # Tree + 3 children
+        assert lines[0] == "list"
+        assert len(lines) == 4  # class name + 3 children
 
     def test_last_child_uses_corner(self):
         result = tree_diagram([1.0, 2.0])
@@ -496,8 +496,7 @@ class TestTreeDiagramDrinxDataclass:
 class TestTreeDiagramEdgeCases:
     def test_empty_list(self):
         result = tree_diagram([])
-        # No children — just "Tree" or empty container
-        assert result.startswith("Tree")
+        assert result.startswith("list")
 
     def test_deeply_nested(self):
         # Build a 5-level deep list: [[[[[1.0]]]]]
@@ -506,13 +505,13 @@ class TestTreeDiagramEdgeCases:
             tree = [tree]
         result = tree_diagram(tree)
         lines = result.splitlines()
-        # "Tree" + 4 container lines + 1 leaf = 6 lines
+        # class name + 4 container lines + 1 leaf = 6 lines
         assert len(lines) == 6
 
     def test_wide_tree(self):
         result = tree_diagram(list(range(10)))
         lines = result.splitlines()
-        assert len(lines) == 11  # Tree + 10 leaves
+        assert len(lines) == 11  # class name + 10 leaves
 
     def test_returns_string(self):
         assert isinstance(tree_diagram([1.0, 2.0]), str)
@@ -520,7 +519,7 @@ class TestTreeDiagramEdgeCases:
     def test_single_element_list(self):
         result = tree_diagram([42.0])
         lines = result.splitlines()
-        assert lines[0] == "Tree"
+        assert lines[0] == "list"
         assert "└── [0]=42.0" in lines[1]
 
     def test_dict_nested_in_list(self):
