@@ -12,6 +12,7 @@ from drinx.visualize import (
     _format_key,
     _get_one_level,
     tree_diagram,
+    tree_summary,
     visualize_leaf,
 )
 
@@ -578,3 +579,125 @@ class TestTreeDiagramStaticLeaves:
         assert ".shape:tuple" in result
         assert "[0]=2" in result
         assert "[1]=3" in result
+
+
+# ---------------------------------------------------------------------------
+# tree_summary
+# ---------------------------------------------------------------------------
+
+
+class TestTreeSummary:
+    def test_returns_string(self):
+        assert isinstance(tree_summary([1.0, 2.0]), str)
+
+    def test_header_row_present(self):
+        result = tree_summary([1.0])
+        assert "Name" in result
+        assert "Type" in result
+        assert "Count" in result
+        assert "Size" in result
+
+    def test_summary_row_present(self):
+        result = tree_summary([1.0])
+        assert "Σ" in result
+        assert "Tree" in result
+
+    def test_python_scalar_no_size(self):
+        result = tree_summary([1.0, 2.0])
+        lines = result.splitlines()
+        # Find the data rows (skip header and dividers)
+        data_rows = [
+            line
+            for line in lines
+            if line.startswith("│") and "Name" not in line and "Σ" not in line
+        ]
+        # Each scalar leaf should have no size entry (empty size column)
+        for row in data_rows:
+            cells = [c.strip() for c in row.strip("│").split("│")]
+            assert cells[3] == ""  # Size column empty for scalars
+
+    def test_array_leaf_has_size(self):
+        arr = jnp.ones((3,), dtype=jnp.float32)
+        result = tree_summary([arr])
+        assert "12.00B" in result  # 3 * 4 bytes
+
+    def test_array_leaf_count(self):
+        arr = jnp.ones((4,), dtype=jnp.float32)
+        result = tree_summary([arr])
+        # Count column should show 4
+        assert "│4" in result or "│4 " in result
+
+    def test_total_count_and_size(self):
+        arr = jnp.ones((3,), dtype=jnp.float32)
+        result = tree_summary({"x": 1.0, "arr": arr})
+        # total count = 1 (scalar) + 3 (array) = 4
+        lines = result.splitlines()
+        sigma_row = next(line for line in lines if "Σ" in line)
+        cells = [c.strip() for c in sigma_row.strip("│").split("│")]
+        assert cells[2] == "4"  # total count
+        assert "12.00B" in cells[3]  # total size
+
+    def test_dataclass_leaves(self):
+        class Pt(DataClass):
+            x: float
+            y: jnp.ndarray
+
+        pt = Pt(x=1.0, y=jnp.array([1.0, 2.0], dtype=jnp.float32))
+        result = tree_summary(pt)
+        assert ".x" in result
+        assert ".y" in result
+        assert "float" in result
+        assert "f32[2]" in result
+
+    def test_column_widths_adapt(self):
+        # A very long path name should widen the Name column
+        result = tree_summary({"a_very_long_key_name": 1.0})
+        assert "a_very_long_key_name" in result
+
+    def test_max_depth_none_expands_fully(self):
+        result_default = tree_summary([[1.0, 2.0], 3.0])
+        result_none = tree_summary([[1.0, 2.0], 3.0], max_depth=None)
+        assert result_default == result_none
+        # All three leaf paths present
+        assert "[0][0]" in result_default
+        assert "[0][1]" in result_default
+        assert "[1]" in result_default
+
+    def test_max_depth_1_aggregates_subtree(self):
+        arr = jnp.ones((2,), dtype=jnp.float32)
+        # Depth-1: [arr, arr] — each element is a leaf at depth 1
+        result = tree_summary([[arr, arr], arr], max_depth=1)
+        lines = result.splitlines()
+        # The nested list should be a single aggregated row
+        data_rows = [
+            line
+            for line in lines
+            if line.startswith("│") and "Name" not in line and "Σ" not in line
+        ]
+        assert len(data_rows) == 2  # [0] aggregated + [1] leaf
+
+    def test_max_depth_1_aggregated_count(self):
+        arr = jnp.ones((3,), dtype=jnp.float32)
+        result = tree_summary([[arr, arr], arr], max_depth=1)
+        lines = result.splitlines()
+        sigma_row = next(line for line in lines if "Σ" in line)
+        cells = [c.strip() for c in sigma_row.strip("│").split("│")]
+        # Total: 3+3+3 = 9 elements
+        assert cells[2] == "9"
+
+    def test_format_bytes_units(self):
+        # 2KB array
+        arr = jnp.ones((512,), dtype=jnp.float32)  # 512 * 4 = 2048 bytes
+        result = tree_summary([arr])
+        assert "KB" in result
+
+    def test_pure_list_of_arrays(self):
+        arrays = [jnp.ones((2,), dtype=jnp.float32) for _ in range(3)]
+        result = tree_summary(arrays)
+        lines = result.splitlines()
+        data_rows = [
+            line
+            for line in lines
+            if line.startswith("│") and "Name" not in line and "Σ" not in line
+        ]
+        assert len(data_rows) == 3  # one row per array leaf

@@ -150,6 +150,124 @@ def _build_lines(
             )
 
 
+def _leaf_type_str(val: Any) -> str:
+    if isinstance(val, (bool, int, float, complex)):
+        return type(val).__name__
+    if isinstance(val, (np.ndarray, jax.Array)):
+        dtype = val.dtype
+        dtype_str = "bool" if dtype.kind == "b" else f"{dtype.kind}{dtype.itemsize * 8}"
+        return f"{dtype_str}[{','.join(map(str, val.shape))}]"
+    return type(val).__name__
+
+
+def _leaf_count(val: Any) -> int:
+    if isinstance(val, (np.ndarray, jax.Array)):
+        return val.size
+    return 1
+
+
+def _format_bytes(nbytes: int) -> str:
+    if nbytes < 1024:
+        return f"{nbytes:.2f}B"
+    elif nbytes < 1024**2:
+        return f"{nbytes / 1024:.2f}KB"
+    elif nbytes < 1024**3:
+        return f"{nbytes / 1024**2:.2f}MB"
+    else:
+        return f"{nbytes / 1024**3:.2f}GB"
+
+
+def _leaf_size_str(val: Any) -> str:
+    if isinstance(val, (np.ndarray, jax.Array)) and not isinstance(
+        val, (bool, int, float, complex)
+    ):
+        return _format_bytes(val.nbytes)
+    return ""
+
+
+def _collect_summary_entries(
+    node: Any, path_str: str, depth: int, max_depth: int | None
+) -> list[tuple[str, Any]]:
+    children = _get_one_level(node)
+    if children is None:
+        return [(path_str, node)]
+    if max_depth is not None and depth >= max_depth:
+        return [(path_str, node)]
+    result = []
+    for key_label, child in children:
+        result.extend(
+            _collect_summary_entries(child, path_str + key_label, depth + 1, max_depth)
+        )
+    return result
+
+
+def tree_summary(tree: Any, max_depth: int | None = None) -> str:
+    """Render a JAX pytree's leaves as a tabular summary.
+
+    Columns: Name (path), Type, Count (element count), Size (byte size).
+
+    Args:
+        tree: Any JAX pytree.
+        max_depth: Maximum depth to expand. ``None`` means unlimited (all leaves).
+            When a subtree is truncated at ``max_depth``, it appears as a single
+            row with aggregated count and size.
+
+    Returns:
+        A multi-line string with the summary table.
+    """
+    entries = _collect_summary_entries(tree, "", 0, max_depth)
+
+    rows: list[tuple[str, str, str, str]] = []
+    total_count = 0
+    total_bytes = 0
+
+    for name, val in entries:
+        is_leaf = _get_one_level(val) is None
+        if is_leaf:
+            type_str = _leaf_type_str(val)
+            count = _leaf_count(val)
+            size_str = _leaf_size_str(val)
+            entry_bytes = val.nbytes if isinstance(val, (np.ndarray, jax.Array)) else 0
+        else:
+            type_str = type(val).__name__
+            sub_leaves = jax.tree_util.tree_leaves(val)
+            count = sum(_leaf_count(lf) for lf in sub_leaves)
+            entry_bytes = sum(
+                lf.nbytes
+                for lf in sub_leaves
+                if isinstance(lf, (np.ndarray, jax.Array))
+            )
+            size_str = _format_bytes(entry_bytes) if entry_bytes > 0 else ""
+        rows.append((name, type_str, str(count), size_str))
+        total_count += count
+        total_bytes += entry_bytes
+
+    summary_size = _format_bytes(total_bytes) if total_bytes > 0 else ""
+    rows.append(("Σ", "Tree", str(total_count), summary_size))
+
+    headers = ("Name", "Type", "Count", "Size")
+    col_widths = [
+        max(len(h), max(len(r[i]) for r in rows)) for i, h in enumerate(headers)
+    ]
+
+    def render_row(cells: tuple[str, ...]) -> str:
+        return "│" + "│".join(c.ljust(w) for c, w in zip(cells, col_widths)) + "│"
+
+    def divider(left: str, mid: str, right: str) -> str:
+        return left + mid.join("─" * w for w in col_widths) + right
+
+    lines = [
+        divider("┌", "┬", "┐"),
+        render_row(headers),
+    ]
+    for row in rows:
+        lines.append(divider("├", "┼", "┤"))
+        lines.append(render_row(row))
+    lines.append(divider("└", "┴", "┘"))
+
+    return "\n".join(lines)
+
+
 def tree_diagram(
     tree: Any, max_depth: int | None = None, static_leaves: bool = False
 ) -> str:
