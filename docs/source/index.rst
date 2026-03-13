@@ -1,4 +1,4 @@
-.. image:: https://github.com/ymahlau/drinx/blob/main/docs/source/_static/drinx.png?raw=true
+.. image:: _static/drinx.png
    :alt: Drinx Logo
    :align: center
 
@@ -158,4 +158,5 @@ Drinx dataclasses work with all JAX transforms out of the box:
 
    self
    examples/basic_usage.ipynb
+   examples/advanced.ipynb
    api
