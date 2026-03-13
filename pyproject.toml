@@ -1,6 +1,6 @@
 [project]
 name = "drinx"
-version = "1.0.0"
+version = "1.1.0"
 description = "Drinx: Dataclass Registry in JAX"
 readme = "README.md"
 authors = [
