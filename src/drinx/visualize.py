@@ -13,6 +13,16 @@ def _fmt(x: float) -> str:
     return f"{x:.2g}"
 
 
+def _is_array(val: Any) -> bool:
+    """Return True if val is a NumPy or JAX array (not a Python scalar)."""
+    return isinstance(val, (np.ndarray, jax.Array))
+
+
+def _dtype_str(dtype: np.dtype) -> str:
+    """Return compact dtype label: 'bool' for booleans, else '<kind><bits>' e.g. 'f32'."""
+    return "bool" if dtype.kind == "b" else f"{dtype.kind}{dtype.itemsize * 8}"
+
+
 def visualize_leaf(val: int | float | complex | bool | np.ndarray | jax.Array) -> str:
     """Return a compact human-readable summary string for a JAX pytree leaf.
 
@@ -43,13 +53,13 @@ def visualize_leaf(val: int | float | complex | bool | np.ndarray | jax.Array) -
     if isinstance(val, (bool, int, float, complex)):
         return repr(val)
 
-    if not isinstance(val, (np.ndarray, jax.Array)):
+    if not _is_array(val):
         return repr(val)
 
     dtype, shape = val.dtype, val.shape
 
     # 2. Build compact dtype string (NumPy's dtype.kind already returns 'f', 'i', 'u', 'c', 'b')
-    dtype_str = "bool" if dtype.kind == "b" else f"{dtype.kind}{dtype.itemsize * 8}"
+    dtype_str = _dtype_str(dtype)
     prefix = (
         f"{dtype_str}[{','.join(map(str, shape))}]"  # ty:ignore[invalid-argument-type]
     )
@@ -153,15 +163,14 @@ def _build_lines(
 def _leaf_type_str(val: Any) -> str:
     if isinstance(val, (bool, int, float, complex)):
         return type(val).__name__
-    if isinstance(val, (np.ndarray, jax.Array)):
+    if _is_array(val):
         dtype = val.dtype
-        dtype_str = "bool" if dtype.kind == "b" else f"{dtype.kind}{dtype.itemsize * 8}"
-        return f"{dtype_str}[{','.join(map(str, val.shape))}]"
+        return f"{_dtype_str(dtype)}[{','.join(map(str, val.shape))}]"
     return type(val).__name__
 
 
 def _leaf_count(val: Any) -> int:
-    if isinstance(val, (np.ndarray, jax.Array)):
+    if _is_array(val):
         return val.size
     return 1
 
@@ -178,9 +187,7 @@ def _format_bytes(nbytes: int) -> str:
 
 
 def _leaf_size_str(val: Any) -> str:
-    if isinstance(val, (np.ndarray, jax.Array)) and not isinstance(
-        val, (bool, int, float, complex)
-    ):
+    if _is_array(val):
         return _format_bytes(val.nbytes)
     return ""
 
@@ -227,16 +234,12 @@ def tree_summary(tree: Any, max_depth: int | None = None) -> str:
             type_str = _leaf_type_str(val)
             count = _leaf_count(val)
             size_str = _leaf_size_str(val)
-            entry_bytes = val.nbytes if isinstance(val, (np.ndarray, jax.Array)) else 0
+            entry_bytes = val.nbytes if _is_array(val) else 0
         else:
             type_str = type(val).__name__
             sub_leaves = jax.tree_util.tree_leaves(val)
             count = sum(_leaf_count(lf) for lf in sub_leaves)
-            entry_bytes = sum(
-                lf.nbytes
-                for lf in sub_leaves
-                if isinstance(lf, (np.ndarray, jax.Array))
-            )
+            entry_bytes = sum(lf.nbytes for lf in sub_leaves if _is_array(lf))
             size_str = _format_bytes(entry_bytes) if entry_bytes > 0 else ""
         rows.append((name, type_str, str(count), size_str))
         total_count += count
