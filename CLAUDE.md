@@ -58,4 +58,4 @@ The library lives in `src/drinx/` with four files:
 - All drinx dataclasses are **always frozen** (`frozen=True` is hardcoded). This is required for correctness as JAX pytree nodes must be immutable.
 - The `jax_static` metadata key is the internal marker used to distinguish static vs. dynamic fields.
 - Two usage patterns: decorator (`@drinx.dataclass`) or inheritance (`class Foo(DataClass)`). Both produce identically registered pytrees. `DataClass` methods (`aset`, `updated_copy`, `.at[].set()`) are only available with the inheritance pattern.
-- The library has a single runtime dependency: `jax>=0.9.0`.
+- The library has runtime dependencies: `jax>=0.9.0` and `numpy>=2.4.3`
