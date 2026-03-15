@@ -191,7 +191,25 @@ print(drinx.tree_summary(model))
 For more examples and a detailed documentation, check out the API [here](https://drinx.readthedocs.io/en/latest/).
 
 
+## Comparison to Alternatives
+
+There exist a number of other libraries, which also integrate dataclass functionality with JAX.
+The most similar libraries to drinx are [`jax_dataclass`](https://github.com/brentyi/jax_dataclasses) and [`pytreeclass`](https://github.com/ASEM000/pytreeclass), though `pytreeclass` is unfortunately no longer actively maintained.
+Other libraries that are not specifically focusing on dataclasses, but have some functionality for them included, are the [`chex.dataclass`](https://github.com/google-deepmind/chex), [`flax.struct`](https://github.com/google/flax) or [`tjax.dataclass`](https://github.com/NeilGirdhar/tjax).
+
+The main differences between the libraries are:
+- **Static Fields:**: `drinx.field(static=True)` or `drinx.static_field()` can be used to mark dataclass attributes as static. The `pytreeclass` and `flax` library support a similar system. `jax_dataclass` supports static fields through marking an attribute as `Annotated[..., Static]`. `chex` and `tjax` do not support static attributes.
+- **Attribute Updates**: `drinx` implements the `.at["attribute"].set()` syntax for functional updates of top-level attributes and `.aset()` for updates of nested structures. The `.at[].set()` syntax is also supported by `pytreeclass`, which heavily inspired our implementation. `tjax` implements a context manager which allows for updates of frozen classes, but this is non-functional and makes the usage in jit transforms difficult. `flax` implements a `.replace()` function for changing top-level attributes, but not nested updates.  `chex` only support updates through creating a new object.
+- **Static Type Checking:** Both `drinx` and `jax_dataclass` are thin wrappers around the python dataclass and consequently have full type checking support. All other libraries have some limitations with regards for type checking, for example `kw_only` does not work in `tjax` or `flax`.
+- **Visualization**: `drinx` implements some nice visualizations through `drinx.tree_diagram` and `drinx.tree_summary` which is heavily inspired by the `pytreeclass` library. Other libraries do not implement visualization tools out of the box.
+
+
 ## Citation
 
 TODO: add citation once published
 
+## Other links
+
+Also check out my other repositories:
+* [**💡 FDTDX**](https://github.com/ymahlau/fdtdx) - Electromagnetic FDTD Simulations in JAX. ![Stars](https://img.shields.io/github/stars/ymahlau/fdtdx?style=social)
+* [**🔮 BONNI**](https://github.com/ymahlau/fdtdx) - Bayesian Optimization via Neural Network surrogates and Interior Point Optimization ![Stars](https://img.shields.io/github/stars/ymahlau/bonni?style=social)

@@ -128,7 +128,7 @@ class TestClassKeywordArgs:
 
         # kw_only means positional args are not allowed
         with pytest.raises(TypeError):
-            Foo(1.0)
+            Foo(1.0)  # ty:ignore[missing-argument, too-many-positional-arguments]
         foo = Foo(x=1.0)
         assert foo.x == 1.0
 
