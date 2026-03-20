@@ -1,11 +1,19 @@
 from __future__ import annotations
+from collections.abc import Sequence as ABCSequence
 import dataclasses
 import jax
 import jax.numpy as jnp
 from drinx.transform import dataclass
-from typing import dataclass_transform, Any, Generic, Self, TypeVar
+from typing import dataclass_transform, Any, Callable, Generic, Sequence, Self, TypeVar
 from dataclasses import field as orig_field
-from drinx.attribute import field, static_field, private_field, static_private_field
+from drinx.attribute import (
+    DRINX_ON_GETATTR,
+    DRINX_ON_SETATTR,
+    field,
+    private_field,
+    static_field,
+    static_private_field,
+)
 
 
 @dataclass_transform(
@@ -77,6 +85,14 @@ class DataClass:
                 compatibility).
         """
         super().__init_subclass__()
+        user_post_init = cls.__dict__.get("__post_init__")
+        if user_post_init is not None and user_post_init is not DataClass.__post_init__:
+            setattr(
+                cls,
+                "__post_init__",
+                DataClass._wrap_user_post_init(user_post_init),
+            )
+
         # Programmatically apply our custom dataclass wrapper to the subclass.
         dataclass_transform = dataclass(
             init=init,
@@ -89,6 +105,115 @@ class DataClass:
             weakref_slot=weakref_slot,
         )
         dataclass_transform(cls)
+        setattr(cls, "__setattr__", DataClass.__setattr__)
+        setattr(cls, "__getattribute__", DataClass.__getattribute__)
+
+    @staticmethod
+    def _wrap_user_post_init(
+        user_post_init: Callable[..., Any],
+    ) -> Callable[..., None]:
+        """Wraps the user-defined __post_init__ to ensure framework-level initialization logic runs afterward."""
+
+        def wrapped(self: DataClass, *args: Any, **kwargs: Any) -> None:
+            user_post_init(self, *args, **kwargs)
+            DataClass.__post_init__(self)
+
+        return wrapped
+
+    @staticmethod
+    def _normalize_callbacks(callbacks: Any) -> tuple[Callable[..., Any], ...]:
+        """Standardizes callback metadata into a consistent tuple of callable functions."""
+        if callbacks is None:
+            return ()
+        if isinstance(callbacks, ABCSequence) and not isinstance(
+            callbacks, (str, bytes)
+        ):
+            return tuple(callbacks)
+        return (callbacks,)
+
+    @staticmethod
+    def _run_callbacks(value: Any, callbacks: Sequence[Callable[..., Any]]) -> Any:
+        """Sequentially applies a series of callback functions to a value, passing the result of one to the next."""
+        result = value
+        for callback in callbacks:
+            callback_result = callback(result)
+            if callback_result is not None:
+                result = callback_result
+        return result
+
+    @staticmethod
+    def _get_field_definition(instance: DataClass, name: str) -> Any:
+        """Safely retrieves the dataclass field metadata for a specific attribute name using low-level access."""
+        try:
+            dataclass_fields = object.__getattribute__(instance, "__dataclass_fields__")
+        except AttributeError:
+            return None
+        return dataclass_fields.get(name)
+
+    def __post_init__(self) -> None:
+        """Executes initial field transformations and sets the initialization flag to lock the instance for immutability."""
+        object.__setattr__(self, "_drinx_initialized", False)
+        instance_dict = object.__getattribute__(self, "__dict__")
+        if instance_dict.get("_drinx_active_logic_applied", False):
+            object.__setattr__(self, "_drinx_initialized", True)
+            return
+        object.__setattr__(self, "_drinx_active_logic_applied", True)
+
+        for dc_field in dataclasses.fields(self):
+            try:
+                value = object.__getattribute__(self, dc_field.name)
+            except AttributeError:
+                continue
+            callbacks = DataClass._normalize_callbacks(
+                dc_field.metadata.get(DRINX_ON_SETATTR, ())
+            )
+            value = DataClass._run_callbacks(value, callbacks)
+            object.__setattr__(self, dc_field.name, value)
+        object.__setattr__(self, "_drinx_initialized", True)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Prevents modifications after initialization and applies setter callbacks during the initial phase."""
+        try:
+            is_initialized = object.__getattribute__(self, "_drinx_initialized")
+        except AttributeError:
+            is_initialized = False
+
+        if is_initialized:
+            raise dataclasses.FrozenInstanceError(f"cannot assign to field {name!r}")
+
+        dc_field = DataClass._get_field_definition(self, name)
+        if dc_field is None:
+            try:
+                instance_dict = object.__getattribute__(self, "__dict__")
+            except AttributeError:
+                instance_dict = {}
+            if name not in instance_dict and not hasattr(type(self), name):
+                raise AttributeError(
+                    f"{type(self).__name__!r} has no attribute {name!r}"
+                )
+            object.__setattr__(self, name, value)
+            return
+
+        callbacks = DataClass._normalize_callbacks(
+            dc_field.metadata.get(DRINX_ON_SETATTR, ())
+        )
+        value = DataClass._run_callbacks(value, callbacks)
+        object.__setattr__(self, name, value)
+
+    def __getattribute__(self, name: str) -> Any:
+        """Intercepts attribute access to apply getter callbacks for transformations like automatic unfreezing."""
+        value = object.__getattribute__(self, name)
+        if name.startswith("__") and name.endswith("__"):
+            return value
+
+        dc_field = DataClass._get_field_definition(self, name)
+        if dc_field is None:
+            return value
+
+        callbacks = DataClass._normalize_callbacks(
+            dc_field.metadata.get(DRINX_ON_GETATTR, ())
+        )
+        return DataClass._run_callbacks(value, callbacks)
 
     @staticmethod
     def _parse_operations(s: str) -> list[tuple[str | int, str]]:

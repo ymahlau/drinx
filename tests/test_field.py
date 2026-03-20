@@ -3,6 +3,7 @@
 import dataclasses
 
 from drinx import field, private_field, static_field, static_private_field
+from drinx.attribute import DRINX_ON_GETATTR, DRINX_ON_SETATTR
 
 
 class TestField:
@@ -81,6 +82,20 @@ class TestField:
         assert f.default == 99
         assert f.metadata["jax_static"] is True
 
+    def test_on_setattr_metadata(self):
+        def callback(x):
+            return x
+
+        f = field(on_setattr=(callback,))
+        assert f.metadata[DRINX_ON_SETATTR] == (callback,)
+
+    def test_on_getattr_metadata(self):
+        def callback(x):
+            return x
+
+        f = field(on_getattr=(callback,))
+        assert f.metadata[DRINX_ON_GETATTR] == (callback,)
+
 
 class TestStaticField:
     def test_is_static(self):
@@ -121,6 +136,17 @@ class TestStaticField:
     def test_returns_dataclass_field(self):
         f = static_field()
         assert isinstance(f, dataclasses.Field)
+
+    def test_callbacks_are_forwarded(self):
+        def on_set(x):
+            return x
+
+        def on_get(x):
+            return x
+
+        f = static_field(on_setattr=(on_set,), on_getattr=(on_get,))
+        assert f.metadata[DRINX_ON_SETATTR] == (on_set,)
+        assert f.metadata[DRINX_ON_GETATTR] == (on_get,)
 
 
 class TestPrivateField:
@@ -164,6 +190,17 @@ class TestPrivateField:
         f = private_field(default=0)
         assert isinstance(f, dataclasses.Field)
 
+    def test_callbacks_are_forwarded(self):
+        def on_set(x):
+            return x
+
+        def on_get(x):
+            return x
+
+        f = private_field(default=0, on_setattr=(on_set,), on_getattr=(on_get,))
+        assert f.metadata[DRINX_ON_SETATTR] == (on_set,)
+        assert f.metadata[DRINX_ON_GETATTR] == (on_get,)
+
 
 class TestStaticPrivateField:
     def test_is_static(self):
@@ -202,3 +239,14 @@ class TestStaticPrivateField:
     def test_returns_dataclass_field(self):
         f = static_private_field(default=0)
         assert isinstance(f, dataclasses.Field)
+
+    def test_callbacks_are_forwarded(self):
+        def on_set(x):
+            return x
+
+        def on_get(x):
+            return x
+
+        f = static_private_field(default=0, on_setattr=(on_set,), on_getattr=(on_get,))
+        assert f.metadata[DRINX_ON_SETATTR] == (on_set,)
+        assert f.metadata[DRINX_ON_GETATTR] == (on_get,)
