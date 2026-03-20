@@ -70,6 +70,50 @@ class TestBasicSubclassing:
 
 
 # ---------------------------------------------------------------------------
+# Active logic (on_setattr / on_getattr)
+# ---------------------------------------------------------------------------
+
+
+class TestActiveLogic:
+    def test_on_setattr_runs_in_post_init_for_default_values(self):
+        def none_to_default(value):
+            return "auto" if value is None else value
+
+        class Foo(DataClass):
+            name: str | None = field(default=None, on_setattr=(none_to_default,))
+
+        foo = Foo()
+        assert foo.name == "auto"
+
+    def test_on_setattr_runtime_assignment_is_frozen(self):
+        class Foo(DataClass):
+            name: str = field(on_setattr=(lambda v: v.strip().upper(),))
+
+        foo = Foo(name="  init  ")
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            foo.name = "  runtime  "
+
+    def test_on_getattr_runs_on_runtime_access(self):
+        class Foo(DataClass):
+            x: int = field(default=2, on_getattr=(lambda v: v * 3,))
+
+        foo = Foo()
+        assert foo.x == 6
+
+    def test_user_post_init_is_preserved_and_callbacks_still_run(self):
+        class Foo(DataClass):
+            x: int = field(default=1, on_setattr=(lambda v: v + 1,))
+            y: int = private_field(default=0)
+
+            def __post_init__(self) -> None:
+                self.aset_inplace("y", 10)
+
+        foo = Foo()
+        assert foo.x == 2
+        assert foo.y == 10
+
+
+# ---------------------------------------------------------------------------
 # Always frozen
 # ---------------------------------------------------------------------------
 

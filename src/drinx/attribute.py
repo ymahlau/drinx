@@ -1,5 +1,9 @@
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 from dataclasses import field as orig_field, MISSING
+
+# Define constants for metadata key names to prevent hard-coded string erros
+DRINX_ON_SETATTR = "drinx_on_setattr"
+DRINX_ON_GETATTR = "drinx_on_getattr"
 
 
 def field(
@@ -13,6 +17,8 @@ def field(
     metadata: dict[str, Any] | None = None,
     kw_only: Any = MISSING,
     static: bool = False,
+    on_setattr: Sequence[Callable[..., Any]] = (),
+    on_getattr: Sequence[Callable[..., Any]] = (),
 ) -> Any:
     """Define a dataclass field with optional JAX static marking.
 
@@ -39,8 +45,10 @@ def field(
         A :class:`dataclasses.Field` descriptor (typed as ``Any`` for
         compatibility with type checkers).
     """
-    metadata = metadata or {}
+    metadata = dict(metadata or {})
     metadata["jax_static"] = static
+    metadata[DRINX_ON_SETATTR] = tuple(on_setattr)
+    metadata[DRINX_ON_GETATTR] = tuple(on_getattr)
 
     return orig_field(
         default=default,
@@ -64,6 +72,8 @@ def static_field(
     compare: bool = True,
     metadata: dict[str, Any] | None = None,
     kw_only: Any = MISSING,
+    on_setattr: Sequence[Callable[..., Any]] = (),
+    on_getattr: Sequence[Callable[..., Any]] = (),
 ) -> Any:
     """Define a JAX-static dataclass field.
 
@@ -95,6 +105,8 @@ def static_field(
         metadata=metadata,
         kw_only=kw_only,
         static=True,
+        on_setattr=on_setattr,
+        on_getattr=on_getattr,
     )
 
 
@@ -108,6 +120,8 @@ def private_field(
     metadata: dict[str, Any] | None = None,
     kw_only: Any = MISSING,
     static: bool = False,
+    on_setattr: Sequence[Callable[..., Any]] = (),
+    on_getattr: Sequence[Callable[..., Any]] = (),
 ) -> Any:
     """Define a private (non-init) dataclass field with optional JAX static marking.
 
@@ -139,6 +153,8 @@ def private_field(
         metadata=metadata,
         kw_only=kw_only,
         static=static,
+        on_setattr=on_setattr,
+        on_getattr=on_getattr,
     )
 
 
@@ -151,6 +167,8 @@ def static_private_field(
     compare: bool = True,
     metadata: dict[str, Any] | None = None,
     kw_only: Any = MISSING,
+    on_setattr: Sequence[Callable[..., Any]] = (),
+    on_getattr: Sequence[Callable[..., Any]] = (),
 ) -> Any:
     """Define a private (non-init), JAX-static dataclass field.
 
@@ -181,4 +199,6 @@ def static_private_field(
         metadata=metadata,
         kw_only=kw_only,
         static=True,
+        on_setattr=on_setattr,
+        on_getattr=on_getattr,
     )
