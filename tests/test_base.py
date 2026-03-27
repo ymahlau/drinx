@@ -198,7 +198,7 @@ class TestClassKeywordArgs:
             x: float
 
         with pytest.raises(TypeError):
-            Foo(x=1.0) < Foo(x=2.0)  # type: ignore[operator]
+            Foo(x=1.0) < Foo(x=2.0)  # ty:ignore[unsupported-operator]
 
     def test_eq_true_default(self):
         class Foo(DataClass):

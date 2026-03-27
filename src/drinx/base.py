@@ -521,7 +521,7 @@ class DataClass:
             Self: A newly instantiated object with the updated attributes.
         """
         # Directly utilize dataclasses.replace for standard functional updates
-        return dataclasses.replace(self, **kwargs)  # ty:ignore[invalid-argument-type]
+        return dataclasses.replace(self, **kwargs)
 
 
 _DC = TypeVar("_DC", bound="DataClass")

@@ -209,10 +209,12 @@ class TestVisualizeLeafTracers:
 
 class TestVisualizeLeafUnsupported:
     def test_string_returns_repr(self):
-        assert visualize_leaf("hello") == "'hello'"  # type: ignore[arg-type]
+        assert visualize_leaf("hello") == "'hello'"  # ty:ignore[invalid-argument-type]
 
     def test_list_returns_repr(self):
-        assert visualize_leaf([1, 2, 3]) == "[1, 2, 3]"  # type: ignore[arg-type]
+        assert (
+            visualize_leaf([1, 2, 3]) == "[1, 2, 3]"  # ty:ignore[invalid-argument-type]
+        )
 
 
 # ---------------------------------------------------------------------------
