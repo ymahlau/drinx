@@ -80,10 +80,14 @@ class DataClass:
             unsafe_hash: Force generation of ``__hash__`` even when ``eq=True``.
             match_args: Set ``__match_args__`` for structural pattern matching.
             kw_only: Make all fields keyword-only in ``__init__``.
-            slots: Generate ``__slots__`` (ignored; kept for API compatibility).
+            slots: Not supported; ignored.  Slot-based dataclasses are excluded
+                because ``__slots__`` attribute-access speedups are negligible
+                compared to JAX kernel dispatch overhead, and supporting them
+                would add significant complexity to pytree flatten/unflatten.
             weakref_slot: Add a ``__weakref__`` slot (ignored; kept for API
                 compatibility).
         """
+        del slots
         super().__init_subclass__()
         user_post_init = cls.__dict__.get("__post_init__")
         if user_post_init is not None and user_post_init is not DataClass.__post_init__:
