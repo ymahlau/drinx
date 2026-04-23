@@ -19,11 +19,29 @@ def _register_jax_tree(cls_: type[T]) -> type[T]:
     dynamic_fields = [f.name for f in fields(cls_) if not f.metadata.get("jax_static")]
 
     def flatten_with_keys(obj):
-        keyed_leaves = [
-            (jax.tree_util.GetAttrKey(f), getattr(obj, f)) for f in dynamic_fields
-        ]
-        aux = tuple(getattr(obj, f) for f in static_fields)
-        return keyed_leaves, aux
+        keyed_leaves = []
+        for f in dynamic_fields:
+            try:
+                val = getattr(obj, f)
+            except AttributeError:
+                raise AttributeError(
+                    f"Field '{f}' of '{type(obj).__name__}' has not been set. "
+                    "Non-init fields must be assigned a default value or set in __post_init__."
+                ) from None
+            keyed_leaves.append((jax.tree_util.GetAttrKey(f), val))
+
+        aux = []
+        for f in static_fields:
+            try:
+                val = getattr(obj, f)
+            except AttributeError:
+                raise AttributeError(
+                    f"Field '{f}' of '{type(obj).__name__}' has not been set. "
+                    "Non-init fields must be assigned a default value or set in __post_init__."
+                ) from None
+            aux.append(val)
+
+        return keyed_leaves, tuple(aux)
 
     def unflatten(aux, leaves):
         kwargs = {**dict(zip(static_fields, aux)), **dict(zip(dynamic_fields, leaves))}
