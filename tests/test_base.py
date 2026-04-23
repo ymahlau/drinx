@@ -2131,14 +2131,14 @@ class TestAsetInplaceCreateNewOk:
 
 
 class TestAsetInplaceBypassCallbacks:
-    def test_default_bypasses_callbacks(self):
+    def test_default_runs_callbacks(self):
         class Foo(DataClass):
             x: int = field(default=1, on_setattr=(lambda v: v * 2,))
 
         foo = Foo()
         assert foo.x == 2  # init ran callback: 1 * 2 = 2
         foo.aset_inplace("x", 5)
-        assert foo.x == 5  # default bypass_callbacks=True: callback not fired
+        assert foo.x == 10  # default bypass_callbacks=False: callback fires, 5 * 2 = 10
 
     def test_bypass_true_explicit_skips_callback(self):
         class Foo(DataClass):
@@ -2374,15 +2374,15 @@ class TestAsetCallbacks:
 
     # --- E: aset_inplace does not run callbacks ---
 
-    def test_aset_inplace_does_not_run_callbacks(self):
+    def test_aset_inplace_runs_callbacks_by_default(self):
         class Foo(DataClass):
             x: int = field(default=1, on_setattr=(lambda v: v * 2,))
 
         foo = Foo()
         assert foo.x == 2  # init: 1 * 2 = 2
-        # aset_inplace uses object.__setattr__ directly — callbacks never fire
+        # aset_inplace default bypass_callbacks=False — callbacks fire
         foo.aset_inplace("x", 5)
-        assert foo.x == 5  # not 10: callback did not run
+        assert foo.x == 10  # callback ran: 5 * 2 = 10
 
     # --- F: original object unchanged ---
 
