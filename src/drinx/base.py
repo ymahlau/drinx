@@ -390,6 +390,7 @@ class DataClass:
         val: Any,
         create_new_ok: bool = False,
         allow_private: bool = False,
+        bypass_callbacks: bool = False,
     ) -> Self:
         """Sets an attribute of this class. In contrast to the classical .at[].set(), this method updates the class
         attribute directly and does not only operate on jax pytree leaf nodes. Instead, replaces the full attribute
@@ -408,6 +409,9 @@ class DataClass:
             val (Any): Value to set the attribute to
             create_new_ok (bool, optional): If false (default), throw an error if the attribute does not exist.
                 If true, creates a new attribute if the attribute name does not exist yet.
+            bypass_callbacks (bool, optional): If True, skip ``on_setattr`` callbacks for all attribute
+                operations in the path. If False (default), each attribute write runs the callbacks
+                registered on that field, mirroring the behaviour of ``__setattr__`` during ``__init__``.
 
         Returns:
             Self: Updated instance with new attribute value
@@ -459,6 +463,11 @@ class DataClass:
                         f"Field {str(op)!r} has init=False (non-init/private field). "
                         "Pass allow_private=True to allow updating non-init fields."
                     )
+                if not bypass_callbacks:
+                    callbacks = DataClass._normalize_callbacks(
+                        target_field.metadata.get(DRINX_ON_SETATTR, ())
+                    )
+                    cur_attr = DataClass._run_callbacks(cur_attr, callbacks)
                 cur_attr = DataClass._copy_and_set(current_parent, str(op), cur_attr)
 
             elif op_type in ("index", "key"):
@@ -557,7 +566,9 @@ class _AtIndexer(Generic[_DC]):
     def __getitem__(self, key: Any) -> "_AtIndexer[_DC]":
         return _AtIndexer(self._obj, self._path + [key])
 
-    def set(self, value: Any, allow_private: bool = False) -> _DC:
+    def set(
+        self, value: Any, allow_private: bool = False, bypass_callbacks: bool = False
+    ) -> _DC:
         """Apply a functional update and return the new DataClass instance.
 
         If the accumulated path contains only ``str``/``int`` keys, delegates to
@@ -567,6 +578,7 @@ class _AtIndexer(Generic[_DC]):
         Args:
             value: The new value.  For mask updates this may be a scalar or a
                 DataClass tree of the same type as the mask/object.
+            bypass_callbacks: If True, skip ``on_setattr`` callbacks. Default False runs them.
 
         Returns:
             Updated DataClass instance.
@@ -605,7 +617,12 @@ class _AtIndexer(Generic[_DC]):
                     "Expected str, int, or a DataClass mask."
                 )
         path_str = "->".join(parts)
-        return self._obj.aset(path_str, value, allow_private=allow_private)
+        return self._obj.aset(
+            path_str,
+            value,
+            allow_private=allow_private,
+            bypass_callbacks=bypass_callbacks,
+        )
 
 
 class _AtProxy(Generic[_DC]):

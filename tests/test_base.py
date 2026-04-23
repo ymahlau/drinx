@@ -2028,3 +2028,170 @@ class TestAsetInplace:
 
         m = Model(weights=[1.0, 2.0, 3.0])  # ty:ignore[missing-argument]
         assert m.n_params == 3
+
+
+# ---------------------------------------------------------------------------
+# aset / .at[].set() callback behaviour
+# ---------------------------------------------------------------------------
+
+
+class TestAsetCallbacks:
+    # --- A: bypass_callbacks=True skips callbacks ---
+
+    def test_bypass_true_skips_callback_public_field(self):
+        class Foo(DataClass):
+            x: int = field(default=1, on_setattr=(lambda v: v * 2,))
+
+        foo = Foo()
+        assert foo.x == 2  # init: 1 * 2 = 2
+        result = foo.aset("x", 3, bypass_callbacks=True)
+        assert result.x == 3  # callback bypassed, not 6
+
+    def test_bypass_true_skips_callback_private_field(self):
+        class Foo(DataClass):
+            x: int = field(default=0)
+            _computed: str = field(
+                init=False, default="", on_setattr=(lambda v: v.upper(),)
+            )
+
+        foo = Foo(x=1)
+        result = foo.aset(
+            "_computed", "hello", allow_private=True, bypass_callbacks=True
+        )
+        assert result._computed == "hello"  # callback bypassed, not "HELLO"
+
+    # --- B: bypass_callbacks=False (default) runs callbacks ---
+
+    def test_default_runs_callback_public_field(self):
+        class Foo(DataClass):
+            x: int = field(default=1, on_setattr=(lambda v: v * 2,))
+
+        foo = Foo()
+        result = foo.aset("x", 3)  # bypass_callbacks defaults to False
+        assert result.x == 6  # callback ran: 3 * 2 = 6
+
+    def test_bypass_false_runs_callback_public_field(self):
+        class Foo(DataClass):
+            x: int = field(default=1, on_setattr=(lambda v: v * 2,))
+
+        foo = Foo()
+        result = foo.aset("x", 3, bypass_callbacks=False)
+        assert result.x == 6
+
+    def test_bypass_false_runs_callback_private_field(self):
+        class Foo(DataClass):
+            x: int = field(default=0)
+            _raw: float = field(init=False, default=0.0, on_setattr=(lambda v: abs(v),))
+
+        foo = Foo(x=1)
+        result = foo.aset("_raw", -5.0, allow_private=True, bypass_callbacks=False)
+        assert result._raw == 5.0  # callback ran: abs(-5.0) = 5.0
+
+    def test_callback_chain_applied_in_order(self):
+        class Foo(DataClass):
+            x: int = field(default=0, on_setattr=(lambda v: v + 1, lambda v: v * 2))
+
+        foo = Foo(x=0)
+        result = foo.aset("x", 3, bypass_callbacks=False)
+        assert result.x == 8  # (3 + 1) * 2 = 8
+
+    def test_callback_returning_none_passes_value_through(self):
+        class Foo(DataClass):
+            x: int = field(default=0, on_setattr=(lambda v: None,))
+
+        foo = Foo(x=0)
+        result = foo.aset("x", 42, bypass_callbacks=False)
+        assert result.x == 42  # None return means pass-through
+
+    # --- C: Nested paths ---
+
+    def test_bypass_false_fires_leaf_callback_in_nested_path(self):
+        class Inner(DataClass):
+            w: int = field(default=0, on_setattr=(lambda v: v + 10,))
+
+        class Outer(DataClass):
+            inner: Inner
+
+        outer = Outer(inner=Inner(w=1))
+        assert outer.inner.w == 11  # init: 1 + 10 = 11
+        result = outer.aset("inner->w", 5, bypass_callbacks=False)
+        assert result.inner.w == 15  # callback ran: 5 + 10 = 15
+
+    def test_bypass_false_fires_intermediate_callback_in_nested_path(self):
+        class Inner(DataClass):
+            w: int
+
+        class Outer(DataClass):
+            inner: Inner = field(
+                default_factory=lambda: Inner(w=0),
+                on_setattr=(lambda v: type(v)(w=v.w * 2),),
+            )
+
+        outer = Outer(inner=Inner(w=3))
+        assert outer.inner.w == 6  # init: outer's callback doubled w: 3 * 2 = 6
+        result = outer.aset("inner->w", 5, bypass_callbacks=False)
+        # leaf step: no callback on w → new inner has w=5
+        # intermediate step: outer's inner callback fires → Inner(w=5*2=10)
+        assert result.inner.w == 10
+
+    def test_bypass_true_skips_all_callbacks_nested(self):
+        class Inner(DataClass):
+            w: int = field(default=0, on_setattr=(lambda v: v + 10,))
+
+        class Outer(DataClass):
+            inner: Inner
+
+        outer = Outer(inner=Inner(w=1))
+        result = outer.aset("inner->w", 5, bypass_callbacks=True)
+        assert result.inner.w == 5  # w's callback skipped
+
+    # --- D: .at[].set() delegation ---
+
+    def test_at_set_default_runs_callback(self):
+        class Foo(DataClass):
+            x: int = field(default=1, on_setattr=(lambda v: v * 2,))
+
+        foo = Foo()
+        result = foo.at["x"].set(3)
+        assert result.x == 6
+
+    def test_at_set_bypass_true_skips_callback(self):
+        class Foo(DataClass):
+            x: int = field(default=1, on_setattr=(lambda v: v * 2,))
+
+        foo = Foo()
+        result = foo.at["x"].set(3, bypass_callbacks=True)
+        assert result.x == 3
+
+    def test_at_set_private_field_runs_callback(self):
+        class Foo(DataClass):
+            x: int = field(default=0)
+            _raw: float = field(init=False, default=0.0, on_setattr=(lambda v: abs(v),))
+
+        foo = Foo(x=1)
+        result = foo.at["_raw"].set(-7.0, allow_private=True)
+        assert result._raw == 7.0
+
+    # --- E: aset_inplace does not run callbacks ---
+
+    def test_aset_inplace_does_not_run_callbacks(self):
+        class Foo(DataClass):
+            x: int = field(default=1, on_setattr=(lambda v: v * 2,))
+
+        foo = Foo()
+        assert foo.x == 2  # init: 1 * 2 = 2
+        # aset_inplace uses object.__setattr__ directly — callbacks never fire
+        foo.aset_inplace("x", 5)
+        assert foo.x == 5  # not 10: callback did not run
+
+    # --- F: original object unchanged ---
+
+    def test_original_unchanged_when_callbacks_run(self):
+        class Foo(DataClass):
+            x: int = field(default=3, on_setattr=(lambda v: v * 2,))
+
+        foo = Foo()
+        assert foo.x == 6  # init: 3 * 2 = 6
+        updated = foo.aset("x", 5, bypass_callbacks=False)
+        assert updated.x == 10  # 5 * 2 = 10
+        assert foo.x == 6  # original untouched
