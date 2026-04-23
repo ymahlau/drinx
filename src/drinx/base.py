@@ -429,11 +429,16 @@ class DataClass:
 
         # Validate the final step (respecting create_new_ok)
         if final_op_type == "attribute":
-            if not hasattr(parent, str(final_op)):
-                if not create_new_ok:
+            if dataclasses.is_dataclass(parent):
+                dc_field_names = {f.name for f in dataclasses.fields(parent)}
+                if str(final_op) not in dc_field_names and not create_new_ok:
                     raise Exception(
                         f"Attribute: {final_op} does not exist for {parent.__class__}"
                     )
+            elif not hasattr(parent, str(final_op)) and not create_new_ok:
+                raise Exception(
+                    f"Attribute: {final_op} does not exist for {parent.__class__}"
+                )
         elif final_op_type == "index":
             if not hasattr(parent, "__getitem__"):
                 raise Exception(f"{parent.__class__} does not implement __getitem__")

@@ -1521,6 +1521,22 @@ class TestAsetNonInitFields:
         assert updated.x in leaves
         assert updated._cache in leaves
 
+    def test_private_field_no_default(self):
+        """aset with allow_private=True must work for init=False fields that have no
+        default and were never set — so hasattr returns False but the field IS declared."""
+
+        class Foo(DataClass):
+            x: float
+            _derived: float = private_field()
+            # No __post_init__: _derived is absent from instance.__dict__
+
+        foo = Foo(x=3.0)  # ty:ignore[missing-argument]
+        # Before fix: raises "Attribute: _derived does not exist" because hasattr is False
+        # After fix: should return an updated copy with _derived set
+        updated = foo.aset("_derived", 99.0, allow_private=True)
+        assert updated._derived == pytest.approx(99.0)
+        assert updated.x == pytest.approx(3.0)
+
 
 # ---------------------------------------------------------------------------
 # aset method — nested DataClass attributes
