@@ -374,11 +374,22 @@ class DataClass:
             attr_list.append(current_parent)
         return attr_list
 
+    @staticmethod
+    def _copy_and_set(obj: Any, field_name: str, value: Any) -> Any:
+        cls = type(obj)
+        new_obj = object.__new__(cls)
+        instance_dict = object.__getattribute__(obj, "__dict__")
+        for k, v in instance_dict.items():
+            object.__setattr__(new_obj, k, v)
+        object.__setattr__(new_obj, field_name, value)
+        return new_obj
+
     def aset(
         self,
         attr_name: str,
         val: Any,
         create_new_ok: bool = False,
+        allow_private: bool = False,
     ) -> Self:
         """Sets an attribute of this class. In contrast to the classical .at[].set(), this method updates the class
         attribute directly and does not only operate on jax pytree leaf nodes. Instead, replaces the full attribute
@@ -432,14 +443,23 @@ class DataClass:
             current_parent = attr_list[idx]
 
             if op_type == "attribute":
-                # Replaced generic DataClass check with standard dataclasses check
                 if not dataclasses.is_dataclass(current_parent):
                     raise Exception(
                         f"Can only set attribute functionally on a dataclass, but got {current_parent.__class__}"
                     )
 
-                # Use standard dataclasses.replace to functionally copy and update the frozen dataclass
-                cur_attr = dataclasses.replace(current_parent, **{str(op): cur_attr})
+                dc_fields = {f.name: f for f in dataclasses.fields(current_parent)}
+                target_field = dc_fields.get(str(op))
+                if target_field is None:
+                    raise TypeError(
+                        f"Field {str(op)!r} is not a dataclass field of {type(current_parent).__name__!r}."
+                    )
+                if not target_field.init and not allow_private:
+                    raise TypeError(
+                        f"Field {str(op)!r} has init=False (non-init/private field). "
+                        "Pass allow_private=True to allow updating non-init fields."
+                    )
+                cur_attr = DataClass._copy_and_set(current_parent, str(op), cur_attr)
 
             elif op_type in ("index", "key"):
                 if not hasattr(current_parent, "copy"):
@@ -537,7 +557,7 @@ class _AtIndexer(Generic[_DC]):
     def __getitem__(self, key: Any) -> "_AtIndexer[_DC]":
         return _AtIndexer(self._obj, self._path + [key])
 
-    def set(self, value: Any) -> _DC:
+    def set(self, value: Any, allow_private: bool = False) -> _DC:
         """Apply a functional update and return the new DataClass instance.
 
         If the accumulated path contains only ``str``/``int`` keys, delegates to
@@ -585,7 +605,7 @@ class _AtIndexer(Generic[_DC]):
                     "Expected str, int, or a DataClass mask."
                 )
         path_str = "->".join(parts)
-        return self._obj.aset(path_str, value)
+        return self._obj.aset(path_str, value, allow_private=allow_private)
 
 
 class _AtProxy(Generic[_DC]):

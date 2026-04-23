@@ -1362,7 +1362,7 @@ class TestAsetTopLevel:
 
     def test_nonexistent_attribute_create_new_ok_true_still_raises(self):
         # create_new_ok=True only skips the existence check on the walk-down;
-        # dataclasses.replace will still reject unknown fields.
+        # unknown fields are rejected because they are not registered dataclass fields.
         class Foo(DataClass):
             x: float
 
@@ -1398,7 +1398,7 @@ class TestAsetTopLevel:
         assert float(updated.x) == pytest.approx(42.0)
 
     def test_update_private_field_raises(self):
-        # dataclasses.replace() disallows init=False fields; private_field sets init=False
+        # allow_private defaults to False; non-init fields must be explicitly opted into
         class Foo(DataClass):
             x: float
             _cache: float = private_field(default=0.0)
@@ -1424,6 +1424,102 @@ class TestAsetTopLevel:
         leaves = jax.tree_util.tree_leaves(updated)
         assert 10.0 in leaves
         assert 2.0 in leaves
+
+
+# ---------------------------------------------------------------------------
+# aset method — non-init (private) fields (require allow_private=True)
+# ---------------------------------------------------------------------------
+
+
+class TestAsetNonInitFields:
+    def test_dynamic_private_field_direct(self):
+        class Foo(DataClass):
+            x: float
+            _cache: float = private_field(default=0.0)
+
+        foo = Foo(x=1.0)
+        updated = foo.aset("_cache", 5.0, allow_private=True)
+        assert updated._cache == 5.0
+        assert updated.x == 1.0
+
+    def test_static_private_field_direct(self):
+        class Foo(DataClass):
+            x: float
+            _static: int = static_private_field(default=0)
+
+        foo = Foo(x=1.0)
+        updated = foo.aset("_static", 99, allow_private=True)
+        assert updated._static == 99
+        assert updated.x == 1.0
+
+    def test_update_preserves_other_init_fields(self):
+        class Foo(DataClass):
+            x: float
+            y: float
+            _cache: float = private_field(default=0.0)
+
+        foo = Foo(x=1.0, y=2.0)
+        updated = foo.aset("_cache", 7.0, allow_private=True)
+        assert updated._cache == 7.0
+        assert updated.x == 1.0
+        assert updated.y == 2.0
+
+    def test_update_preserves_other_non_init_fields(self):
+        class Foo(DataClass):
+            x: float
+            _a: float = private_field(default=10.0)
+            _b: float = private_field(default=20.0)
+
+        foo = Foo(x=1.0)
+        updated = foo.aset("_a", 99.0, allow_private=True)
+        assert updated._a == 99.0
+        assert updated._b == 20.0
+
+    def test_nested_path_ending_at_private_field(self):
+        class Inner(DataClass):
+            w: float
+            _cache: float = private_field(default=0.0)
+
+        class Outer(DataClass):
+            inner: Inner
+            bias: float
+
+        outer = Outer(inner=Inner(w=1.0), bias=0.5)
+        updated = outer.aset("inner->_cache", 42.0, allow_private=True)
+        assert updated.inner._cache == 42.0
+        assert updated.inner.w == 1.0
+        assert updated.bias == 0.5
+
+    def test_at_proxy_with_private_field(self):
+        class Foo(DataClass):
+            x: float
+            _cache: float = private_field(default=0.0)
+
+        foo = Foo(x=1.0)
+        updated = foo.at["_cache"].set(5.0, allow_private=True)
+        assert updated._cache == 5.0
+        assert updated.x == 1.0
+
+    def test_private_field_with_default_factory(self):
+        class Foo(DataClass):
+            x: float
+            _items: list = private_field(default_factory=list)
+
+        foo = Foo(x=1.0)
+        updated = foo.aset("_items", [1, 2, 3], allow_private=True)
+        assert updated._items == [1, 2, 3]
+        assert updated.x == 1.0
+
+    def test_updated_result_is_valid_pytree(self):
+        class Foo(DataClass):
+            x: float
+            _cache: float = private_field(default=0.0)
+
+        foo = Foo(x=1.0)
+        updated = foo.aset("_cache", 5.0, allow_private=True)
+        leaves = jax.tree_util.tree_leaves(updated)
+        assert updated.x in leaves
+        assert updated._cache in leaves
 
 
 # ---------------------------------------------------------------------------

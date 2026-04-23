@@ -60,9 +60,7 @@ def visualize_leaf(val: int | float | complex | bool | np.ndarray | jax.Array) -
 
     # 2. Build compact dtype string (NumPy's dtype.kind already returns 'f', 'i', 'u', 'c', 'b')
     dtype_str = _dtype_str(dtype)
-    prefix = (
-        f"{dtype_str}[{','.join(map(str, shape))}]"  # ty:ignore[invalid-argument-type]
-    )
+    prefix = f"{dtype_str}[{','.join(map(str, shape))}]"
 
     # 3. Handle Tracers
     if is_traced(val):
