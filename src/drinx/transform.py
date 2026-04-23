@@ -156,6 +156,7 @@ def dataclass(
         ``frozen=True`` is always enforced and cannot be overridden.  Mutability
         would break JAX's pytree contract.
     """
+    del slots, weakref_slot
 
     # The wrapper handles the actual class modification
     def wrapper(cls_: type[T]) -> type[T]:
@@ -178,8 +179,8 @@ def dataclass(
             frozen=True,
             match_args=match_args,
             kw_only=kw_only,
-            slots=slots,
-            weakref_slot=weakref_slot,
+            slots=False,
+            weakref_slot=False,
         )
         cls_ = decorator(cls_)
         return _register_jax_tree(cls_)

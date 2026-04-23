@@ -87,7 +87,7 @@ class DataClass:
             weakref_slot: Add a ``__weakref__`` slot (ignored; kept for API
                 compatibility).
         """
-        del slots
+        del slots, weakref_slot
         super().__init_subclass__()
         user_post_init = cls.__dict__.get("__post_init__")
         if user_post_init is not None and user_post_init is not DataClass.__post_init__:
@@ -106,7 +106,7 @@ class DataClass:
             unsafe_hash=unsafe_hash,
             match_args=match_args,
             kw_only=kw_only,
-            weakref_slot=weakref_slot,
+            weakref_slot=False,
         )
         dataclass_transform(cls)
         setattr(cls, "__setattr__", DataClass.__setattr__)

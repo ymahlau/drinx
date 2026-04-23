@@ -581,15 +581,6 @@ class TestStdField:
 
 
 class TestSlots:
-    def test_slots_true(self):
-        @dataclass(slots=True)
-        class Foo:
-            x: float
-
-        foo = Foo(x=1.0)
-        assert foo.x == 1.0
-        assert "__slots__" in dir(type(foo))
-
     def test_slots_false_by_default(self):
         @dataclass
         class Foo:
