@@ -497,7 +497,13 @@ class DataClass:
         assert cur_attr.__class__ == self.__class__
         return cur_attr
 
-    def aset_inplace(self, attr_name: str, val: Any) -> None:
+    def aset_inplace(
+        self,
+        attr_name: str,
+        val: Any,
+        create_new_ok: bool = False,
+        bypass_callbacks: bool = False,
+    ) -> None:
         """Sets an attribute of this dataclass **in place** by bypassing the frozen
         restriction via ``object.__setattr__``.
 
@@ -518,11 +524,45 @@ class DataClass:
         Args:
             attr_name: Path string (see :meth:`aset` for syntax).
             val: Value to assign at the target location.
+            create_new_ok (bool, optional): If False (default), raise if the target
+                attribute or dictionary key does not already exist.  If True, allow
+                setting new attributes or creating new dictionary keys.
+            bypass_callbacks (bool, optional): If True, skip ``on_setattr``
+                callbacks. If False, fire the callbacks registered on the target field before
+                writing, mirroring the behaviour of :meth:`aset` (default).
         """
         ops = self._parse_operations(attr_name)
         attr_list = self._traverse_path(ops)
         final_op, final_op_type = ops[-1]
         parent = attr_list[-1]
+
+        if final_op_type == "attribute":
+            if dataclasses.is_dataclass(parent):
+                dc_field_names = {f.name for f in dataclasses.fields(parent)}
+                if str(final_op) not in dc_field_names and not create_new_ok:
+                    raise Exception(
+                        f"Attribute: {final_op} does not exist for {parent.__class__}"
+                    )
+            elif not hasattr(parent, str(final_op)) and not create_new_ok:
+                raise Exception(
+                    f"Attribute: {final_op} does not exist for {parent.__class__}"
+                )
+        elif final_op_type == "key":
+            if not hasattr(parent, "__getitem__"):
+                raise Exception(f"{parent.__class__} does not implement __getitem__")
+            if final_op not in parent:
+                if not create_new_ok:
+                    raise Exception(f"Key: {final_op} does not exist for {parent}")
+
+        if final_op_type == "attribute" and not bypass_callbacks:
+            if dataclasses.is_dataclass(parent):
+                dc_fields = {f.name: f for f in dataclasses.fields(parent)}
+                target_field = dc_fields.get(str(final_op))
+                if target_field is not None:
+                    callbacks = DataClass._normalize_callbacks(
+                        target_field.metadata.get(DRINX_ON_SETATTR, ())
+                    )
+                    val = DataClass._run_callbacks(val, callbacks)
 
         if final_op_type == "attribute":
             object.__setattr__(parent, str(final_op), val)

@@ -2031,6 +2031,206 @@ class TestAsetInplace:
 
 
 # ---------------------------------------------------------------------------
+# aset_inplace — create_new_ok
+# ---------------------------------------------------------------------------
+
+
+class TestAsetInplaceCreateNewOk:
+    def test_default_raises_on_missing_attribute(self):
+        class Foo(DataClass):
+            x: float
+
+        foo = Foo(x=1.0)
+        with pytest.raises(Exception, match="does not exist"):
+            foo.aset_inplace("nonexistent", 42.0)
+
+    def test_default_raises_on_missing_dict_key(self):
+        class Foo(DataClass):
+            data: dict
+
+        foo = Foo(data={"a": 1.0})
+        with pytest.raises(Exception, match="does not exist"):
+            foo.aset_inplace("data->['missing']", 99.0)
+
+    def test_create_new_ok_sets_new_attribute(self):
+        class Foo(DataClass):
+            x: float
+
+        foo = Foo(x=1.0)
+        foo.aset_inplace("brand_new", 7.0, create_new_ok=True)
+        assert foo.brand_new == 7.0  # type: ignore[attr-defined]
+
+    def test_create_new_ok_creates_new_dict_key(self):
+        class Foo(DataClass):
+            data: dict
+
+        foo = Foo(data={"a": 1.0})
+        foo.aset_inplace("data->['b']", 2.0, create_new_ok=True)
+        assert foo.data["b"] == 2.0
+        assert foo.data["a"] == 1.0
+
+    def test_existing_attribute_works_with_default(self):
+        class Foo(DataClass):
+            x: float
+
+        foo = Foo(x=1.0)
+        foo.aset_inplace("x", 5.0)
+        assert foo.x == 5.0
+
+    def test_existing_dict_key_works_with_default(self):
+        class Foo(DataClass):
+            data: dict
+
+        foo = Foo(data={"k": 0.0})
+        foo.aset_inplace("data->['k']", 9.0)
+        assert foo.data["k"] == 9.0
+
+    def test_list_index_unaffected_by_create_new_ok_false(self):
+        class Foo(DataClass):
+            items: list
+
+        foo = Foo(items=[1.0, 2.0])
+        foo.aset_inplace("items->[1]", 99.0)
+        assert foo.items[1] == 99.0
+
+    def test_list_index_unaffected_by_create_new_ok_true(self):
+        class Foo(DataClass):
+            items: list
+
+        foo = Foo(items=[1.0, 2.0])
+        foo.aset_inplace("items->[0]", 55.0, create_new_ok=True)
+        assert foo.items[0] == 55.0
+
+    def test_nested_path_missing_key_raises(self):
+        class Inner(DataClass):
+            data: dict
+
+        class Outer(DataClass):
+            inner: Inner
+
+        outer = Outer(inner=Inner(data={"a": 1.0}))
+        with pytest.raises(Exception, match="does not exist"):
+            outer.aset_inplace("inner->data->['missing']", 0.0)
+
+    def test_nested_path_missing_key_create_ok(self):
+        class Inner(DataClass):
+            data: dict
+
+        class Outer(DataClass):
+            inner: Inner
+
+        outer = Outer(inner=Inner(data={"a": 1.0}))
+        outer.aset_inplace("inner->data->['new_key']", 42.0, create_new_ok=True)
+        assert outer.inner.data["new_key"] == 42.0
+        assert outer.inner.data["a"] == 1.0
+
+
+# ---------------------------------------------------------------------------
+# aset_inplace — bypass_callbacks
+# ---------------------------------------------------------------------------
+
+
+class TestAsetInplaceBypassCallbacks:
+    def test_default_bypasses_callbacks(self):
+        class Foo(DataClass):
+            x: int = field(default=1, on_setattr=(lambda v: v * 2,))
+
+        foo = Foo()
+        assert foo.x == 2  # init ran callback: 1 * 2 = 2
+        foo.aset_inplace("x", 5)
+        assert foo.x == 5  # default bypass_callbacks=True: callback not fired
+
+    def test_bypass_true_explicit_skips_callback(self):
+        class Foo(DataClass):
+            x: int = field(default=1, on_setattr=(lambda v: v * 3,))
+
+        foo = Foo()
+        foo.aset_inplace("x", 4, bypass_callbacks=True)
+        assert foo.x == 4  # not 12
+
+    def test_bypass_false_runs_callback(self):
+        class Foo(DataClass):
+            x: int = field(default=1, on_setattr=(lambda v: v * 2,))
+
+        foo = Foo()
+        foo.aset_inplace("x", 5, bypass_callbacks=False)
+        assert foo.x == 10  # callback fired: 5 * 2 = 10
+
+    def test_bypass_false_no_callback_registered(self):
+        class Foo(DataClass):
+            x: float
+
+        foo = Foo(x=1.0)
+        foo.aset_inplace("x", 9.0, bypass_callbacks=False)
+        assert foo.x == 9.0  # no callback: value unchanged
+
+    def test_bypass_false_chained_callbacks(self):
+        class Foo(DataClass):
+            x: int = field(
+                default=1,
+                on_setattr=(lambda v: v + 1, lambda v: v * 3),
+            )
+
+        foo = Foo()
+        assert foo.x == 6  # init: (1+1)*3 = 6
+        foo.aset_inplace("x", 2, bypass_callbacks=False)
+        assert foo.x == 9  # (2+1)*3 = 9
+
+    def test_bypass_false_private_field(self):
+        """bypass_callbacks=False on an init=False field after initialization."""
+
+        class Foo(DataClass):
+            x: float
+            _derived: float = field(
+                init=False, default=0.0, on_setattr=(lambda v: v * 2,)
+            )
+
+        foo = Foo(x=5.0)
+        # DataClass.__post_init__ applied callback to default: 0.0 * 2 = 0.0
+        assert foo._derived == 0.0
+        foo.aset_inplace("_derived", 3.0, bypass_callbacks=False)
+        assert foo._derived == 6.0  # callback fired: 3.0 * 2 = 6.0
+
+    def test_bypass_false_index_op_no_callbacks(self):
+        """bypass_callbacks=False on a list index: no callbacks exist, value written as-is."""
+
+        class Foo(DataClass):
+            items: list
+
+        foo = Foo(items=[1.0, 2.0])
+        foo.aset_inplace("items->[0]", 77.0, bypass_callbacks=False)
+        assert foo.items[0] == 77.0
+
+    def test_bypass_false_dict_key_op_no_callbacks(self):
+        """bypass_callbacks=False on a dict key: no callbacks, value written as-is."""
+
+        class Foo(DataClass):
+            data: dict
+
+        foo = Foo(data={"k": 0.0})
+        foo.aset_inplace("data->['k']", 55.0, bypass_callbacks=False)
+        assert foo.data["k"] == 55.0
+
+    def test_create_new_ok_and_bypass_false_combined(self):
+        """create_new_ok=True and bypass_callbacks=False: new key created, callback fires on attr."""
+
+        class Foo(DataClass):
+            data: dict
+            x: int = field(default=1, on_setattr=(lambda v: v + 10,))
+
+        foo = Foo(data={})
+        # create new dict key — no callbacks apply to dict key ops
+        foo.aset_inplace(
+            "data->['fresh']", 3.0, create_new_ok=True, bypass_callbacks=False
+        )
+        assert foo.data["fresh"] == 3.0
+
+        # run callback on existing attribute
+        foo.aset_inplace("x", 5, bypass_callbacks=False)
+        assert foo.x == 15  # 5 + 10 = 15
+
+
+# ---------------------------------------------------------------------------
 # aset / .at[].set() callback behaviour
 # ---------------------------------------------------------------------------
 
