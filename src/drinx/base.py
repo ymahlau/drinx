@@ -362,15 +362,15 @@ class DataClass:
                     raise Exception(
                         f"{current_parent.__class__} does not implement __getitem__"
                     )
-                current_parent = current_parent[int(op)]  # type: ignore
+                current_parent = current_parent[int(op)]
             elif op_type == "key":
                 if not hasattr(current_parent, "__getitem__"):
                     raise Exception(
                         f"{current_parent.__class__} does not implement __getitem__"
                     )
-                if op not in current_parent:  # type: ignore
+                if op not in current_parent:
                     raise Exception(f"Key: {op} does not exist for {current_parent}")
-                current_parent = current_parent[op]  # type: ignore
+                current_parent = current_parent[op]
             else:
                 raise Exception(
                     f"Invalid operation type: {op_type}. This is an internal bug!"
